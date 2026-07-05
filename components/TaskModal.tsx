@@ -1,5 +1,3 @@
-import { TEAM_MEMBERS } from "../app/page";
-
 interface Task {
   id: string;
   title: string;
@@ -18,9 +16,10 @@ interface TaskModalProps {
     id: string,
     updates: { due_date?: string | null; assignee?: string | null }
   ) => void;
+  orgMembers: string[];
 }
 
-export function TaskModal({ task, onClose, onUpdate, onUpdateMeta }: TaskModalProps) {
+export function TaskModal({ task, onClose, onUpdate, onUpdateMeta, orgMembers }: TaskModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
@@ -49,9 +48,20 @@ export function TaskModal({ task, onClose, onUpdate, onUpdateMeta }: TaskModalPr
               onChange={(e) => onUpdateMeta(task.id, { assignee: e.target.value })}
               className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm text-slate-800 bg-slate-50/50"
             >
-              {TEAM_MEMBERS.map((member) => (
-                <option key={member} value={member}>{member}</option>
-              ))}
+              {orgMembers.length === 0 ? (
+                <option value={task.assignee || ""}>{task.assignee || "Atanmadı"}</option>
+              ) : (
+                <>
+                  {task.assignee && !orgMembers.includes(task.assignee) && (
+                    <option value={task.assignee}>{task.assignee}</option>
+                  )}
+                  {orgMembers.map((member) => (
+                    <option key={member} value={member}>
+                      {member.split("@")[0]}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
 

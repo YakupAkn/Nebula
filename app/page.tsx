@@ -1,18 +1,18 @@
 "use client";
 import { useState, useEffect } from "react";
-import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { Column } from "../components/Column";
 import { TaskModal } from "../components/TaskModal";
 import { OrgSetup } from "../components/OrgSetup";
 import { ProjectSetup } from "../components/ProjectSetup";
 import { OrgMembers } from "../components/OrgMembers";
 import { Login } from "../components/Login";
+import LandingPage from "../components/LandingPage";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
-const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
 
-export const TEAM_MEMBERS = ["Yakup", "Erman", "Ömer Faruk"];
+const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
 
 interface Task {
   id: string;
@@ -25,6 +25,10 @@ interface Task {
   assignee: string | null;
 }
 
+interface SupabaseTask extends Omit<Task, "id"> {
+  id: string | number;
+}
+
 export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -35,10 +39,12 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
-  const [newAssignee, setNewAssignee] = useState(TEAM_MEMBERS[0]);
+  const [newAssignee, setNewAssignee] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [orgMembers, setOrgMembers] = useState<string[]>([]);
+  const [showLanding, setShowLanding] = useState(true);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
@@ -57,7 +63,7 @@ export default function Home() {
       .order("position", { ascending: true });
 
     if (!error && data) {
-      setTasks(data.map((t: any) => ({ ...t, id: t.id.toString() })));
+      setTasks((data as SupabaseTask[]).map((t) => ({ ...t, id: t.id.toString() })));
     }
     setLoading(false);
   };
@@ -103,6 +109,36 @@ export default function Home() {
   }, [session]);
 
   useEffect(() => {
+    if (!organizationId) {
+      setOrgMembers([]);
+      return;
+    }
+
+    const fetchOrgMembers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("organization_members")
+          .select("user_email")
+          .eq("organization_id", organizationId);
+
+        if (error) throw error;
+
+        if (data) {
+          const memberEmails = data
+            .map((member: { user_email: string | null }) => member.user_email)
+            .filter((email): email is string => Boolean(email));
+
+          setOrgMembers(memberEmails);
+        }
+      } catch (err) {
+        console.error("Üyeler yüklenirken hata oluştu:", err);
+      }
+    };
+
+    fetchOrgMembers();
+  }, [organizationId]);
+
+  useEffect(() => {
     if (!session || !organizationId || !projectId) return;
 
     fetchTasks();
@@ -145,7 +181,7 @@ export default function Home() {
         tag: newTag,
         description: "",
         position: maxPosition + 1000,
-        assignee: newAssignee,
+        assignee: newAssignee || session?.user.email || null,
         due_date: newDueDate || null,
         project_id: projectId,
       },
@@ -197,12 +233,12 @@ export default function Home() {
     if (error) fetchTasks();
   };
 
-  const handleDragEnd = async (event: any) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id;
-    const overId = over.id;
+    const activeId = String(active.id);
+    const overId = String(over.id);
 
     if (activeId === overId) return;
 
@@ -272,6 +308,10 @@ export default function Home() {
   }
 
   if (!session) {
+    if (showLanding) {
+      return <LandingPage onStart={() => setShowLanding(false)} />;
+    }
+
     return <Login />;
   }
 
@@ -368,13 +408,19 @@ export default function Home() {
                   <option value="Rapor">Rapor</option>
                 </select>
                 <select
-                  value={newAssignee}
+                  value={newAssignee || session?.user.email || ""}
                   onChange={(e) => setNewAssignee(e.target.value)}
                   className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
                 >
-                  {TEAM_MEMBERS.map((member) => (
-                    <option key={member} value={member}>{member}</option>
-                  ))}
+                  {orgMembers.length === 0 ? (
+                    <option value={session?.user.email ?? ""}>{session?.user.email ?? "Ben"}</option>
+                  ) : (
+                    orgMembers.map((email) => (
+                      <option key={email} value={email}>
+                        {email.split("@")[0]}
+                      </option>
+                    ))
+                  )}
                 </select>
                 <input
                   type="date"
@@ -434,6 +480,7 @@ export default function Home() {
             onClose={() => setSelectedTask(null)}
             onUpdate={handleUpdateDescription}
             onUpdateMeta={handleUpdateMeta}
+            orgMembers={orgMembers}
           />
         )}
 
