@@ -1,35 +1,28 @@
-"use client"; // <--- BU SATIRI EKLEMEN ŞART
-
+import type { Metadata } from "next";
 import Script from "next/script";
-import { ThemeProvider } from "next-themes";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Providers } from "../components/Providers"; // Az önce oluşturduğumuz dosya
 import "./globals.css";
-// Metadata sunucu bileşenlerinde çalışır, istemci bileşenlerinde çalışmaz.
-// Eğer Metadata kullanacaksan bu layout'u ikiye bölmen gerekebilir.
-// Ama şimdilik sadece hatayı çözmek için bunu dene.
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Nebula",
+  description: "Nebula, Görev Yönetimi",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Script
-            src="https://www.googletagmanager.com/gtag/js?id=G-X1BB1FB0MZ"
-            strategy="afterInteractive"
-          />
+        <Providers>
+          <Script src="https://www.googletagmanager.com/gtag/js?id=G-X1BB1FB0MZ" strategy="afterInteractive" />
           <Script id="google-analytics" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'G-X1BB1FB0MZ');
-            `}
+            {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-X1BB1FB0MZ');`}
           </Script>
           {children}
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );
