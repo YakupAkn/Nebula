@@ -1,5 +1,7 @@
 "use client";
+
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { Column } from "../components/Column";
 import { TaskModal } from "../components/TaskModal";
@@ -7,10 +9,14 @@ import { OrgSetup } from "../components/OrgSetup";
 import { ProjectSetup } from "../components/ProjectSetup";
 import { OrgMembers } from "../components/OrgMembers";
 import { Login } from "../components/Login";
-import LandingPage from "../components/LandingPage";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
+// Vercel çökme hatasını önlemek için LandingPage'i SSR olmadan içeri aktarıyoruz
+const LandingPageWithoutSSR = dynamic(() => import("../components/LandingPage"), {
+  ssr: false,
+  loading: () => <div className="min-h-screen bg-black" />
+});
 
 const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
 
@@ -62,7 +68,13 @@ export default function Home() {
       .eq("project_id", projectId)
       .order("position", { ascending: true });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Görevler çekilirken hata oluştu:", error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (data) {
       setTasks((data as SupabaseTask[]).map((t) => ({ ...t, id: t.id.toString() })));
     }
     setLoading(false);
@@ -94,7 +106,11 @@ export default function Home() {
       .limit(1)
       .maybeSingle();
 
-    if (!error && data) {
+    if (error) {
+      console.error("Organizasyon kontrolünde hata:", error.message);
+    }
+
+    if (data) {
       setOrganizationId(data.organization_id);
     } else {
       setOrganizationId(null);
@@ -121,7 +137,11 @@ export default function Home() {
           .select("user_email")
           .eq("organization_id", organizationId);
 
-        if (error) throw error;
+        // Hata varsa uygulamayı çökertmemek için throw yerine return kullanıyoruz
+        if (error) {
+          console.error("Supabase üye çekme hatası:", error.message || error);
+          return;
+        }
 
         if (data) {
           const memberEmails = data
@@ -130,8 +150,9 @@ export default function Home() {
 
           setOrgMembers(memberEmails);
         }
-      } catch (err) {
-        console.error("Üyeler yüklenirken hata oluştu:", err);
+      } catch (err: any) {
+        // Beklenmeyen JavaScript hataları için
+        console.error("Beklenmeyen Hata:", err?.message || err);
       }
     };
 
@@ -181,7 +202,7 @@ export default function Home() {
         tag: newTag,
         description: "",
         position: maxPosition + 1000,
-        assignee: newAssignee || session?.user.email || null,
+        assignee: newAssignee || session?.user?.email || null,
         due_date: newDueDate || null,
         project_id: projectId,
       },
@@ -309,7 +330,7 @@ export default function Home() {
 
   if (!session) {
     if (showLanding) {
-      return <LandingPage onStart={() => setShowLanding(false)} />;
+      return <LandingPageWithoutSSR onStart={() => setShowLanding(false)} />;
     }
 
     return <Login />;
@@ -353,7 +374,7 @@ export default function Home() {
             </h1>
             <p className="text-slate-500 text-sm mt-1 font-medium">Ekip görev akışını eş zamanlı takip edin.</p>
           </div>
-<div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
             {/* Form açık değilse bu butonları ve e-postayı göster */}
             {!isFormOpen && (
               <>
