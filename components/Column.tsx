@@ -5,10 +5,11 @@ import { TaskCard } from "./TaskCard";
 interface ColumnProps {
   title: string;
   tasks: any[];
-  onDeleteTask: (id: string) => void; // Yeni ekledik
+  onDeleteTask: (id: string) => void;
+  onTaskClick: (task: any) => void;
 }
 
-export function Column({ title, tasks, onDeleteTask }: ColumnProps) {
+export function Column({ title, tasks, onDeleteTask, onTaskClick }: ColumnProps) {
   const { setNodeRef } = useDroppable({
     id: title,
   });
@@ -30,7 +31,7 @@ export function Column({ title, tasks, onDeleteTask }: ColumnProps) {
       <div ref={setNodeRef} className="flex-1 flex flex-col gap-3">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onDelete={onDeleteTask} />
+            <TaskCard key={task.id} task={task} onDelete={onDeleteTask} onTaskClick={onTaskClick} />
           ))}
         </SortableContext>
       </div>

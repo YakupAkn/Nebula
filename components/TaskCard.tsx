@@ -6,14 +6,16 @@ interface Task {
   title: string;
   status: string;
   tag: string;
+  description: string | null;
 }
 
 interface TaskCardProps {
   task: Task;
   onDelete: (id: string) => void;
+  onTaskClick: (task: Task) => void;
 }
 
-export function TaskCard({ task, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onDelete, onTaskClick }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -35,16 +37,19 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => onTaskClick(task)}
       className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-400/50 transition-all cursor-grab active:cursor-grabbing group relative select-none"
     >
-      <div className="flex justify-between items-center mb-3 select-none">
+      <div className="flex justify-between items-center mb-3">
         <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${tagColors[task.tag] || "bg-slate-100 text-slate-700"}`}>
           {task.tag}
         </span>
         
         <button
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Modalı açmasın diye tıklama olayını üst elemente aktarmıyoruz
             if(confirm("Bu görevi silmek istediğine emin misin?")) onDelete(task.id);
           }}
           className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 p-1 rounded-md hover:bg-rose-50 transition-all duration-200"
@@ -56,11 +61,15 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
         </button>
       </div>
       
-      {/* Sürükleme tetikleyicileri bu alana basınca çalışır, metin seçilemez */}
-      <div {...attributes} {...listeners} className="w-full h-full select-none">
-        <h3 className="font-medium text-slate-800 text-[14px] leading-snug tracking-tight pointer-events-none">
+      <div className="w-full h-full pointer-events-none">
+        <h3 className="font-medium text-slate-800 text-[14px] leading-snug tracking-tight">
           {task.title}
         </h3>
+        {task.description && (
+          <p className="text-slate-400 text-xs mt-1.5 line-clamp-2 leading-relaxed">
+            {task.description}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Column } from "@/components/Column";
+import { Column } from "../components/Column";
+import { TaskModal } from "../components/TaskModal";
 import { supabase } from "@/lib/supabase";
 
 const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
@@ -12,6 +13,7 @@ interface Task {
   title: string;
   status: string;
   tag: string;
+  description: string | null;
 }
 
 export default function Home() {
@@ -20,10 +22,13 @@ export default function Home() {
   const [newTag, setNewTag] = useState("Yazılım");
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  
+  // Seçili kart detayını tutan yeni state yapısı
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 }, // Yanlış tıklamaları önleyen mesafe sınırı
+      activationConstraint: { distance: 5 },
     })
   );
 
@@ -65,7 +70,7 @@ export default function Home() {
     setIsFormOpen(false);
 
     await supabase.from("tasks").insert([
-      { title: newTitle, status: "Yapılacaklar", tag: newTag },
+      { title: newTitle, status: "Yapılacaklar", tag: newTag, description: "" },
     ]);
     setNewTitle("");
   };
@@ -73,6 +78,24 @@ export default function Home() {
   const handleDeleteTask = async (id: string) => {
     setTasks((prevTasks) => prevTasks.filter((t) => t.id !== id));
     const { error } = await supabase.from("tasks").delete().eq("id", parseInt(id));
+    if (error) fetchTasks();
+  };
+
+  // Açıklama alanını veritabanında güncelleyen fonksiyon
+  const handleUpdateDescription = async (id: string, description: string) => {
+    setTasks((prevTasks) =>
+      prevTasks.map((t) => (t.id === id ? { ...t, description } : t))
+    );
+    
+    if (selectedTask && selectedTask.id === id) {
+      setSelectedTask({ ...selectedTask, description });
+    }
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({ description })
+      .eq("id", parseInt(id));
+
     if (error) fetchTasks();
   };
 
@@ -121,7 +144,6 @@ export default function Home() {
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
       <main className="p-8 md:p-12 bg-[#fafafa] min-h-screen font-sans">
         
-        {/* Üst Bar Başlık Yapısı */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-8 mb-8 border-b border-slate-200 gap-6">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -130,9 +152,7 @@ export default function Home() {
             <p className="text-slate-500 text-sm mt-1 font-medium">Ekip görev akışını eş zamanlı takip edin.</p>
           </div>
 
-          {/* Düzeltilmiş Hizalama ve Güvenli Açılır Form Alanı */}
           <div className="flex items-center gap-3">
-            
             {isFormOpen && (
               <form 
                 onSubmit={handleAddTask} 
@@ -164,7 +184,6 @@ export default function Home() {
               </form>
             )}
 
-            {/* Sabit Konumlu Güvenli + Butonu */}
             <button
               type="button"
               onClick={() => setIsFormOpen(!isFormOpen)}
@@ -195,9 +214,19 @@ export default function Home() {
                 title={colTitle} 
                 tasks={tasks.filter((t) => t.status === colTitle)} 
                 onDeleteTask={handleDeleteTask}
+                onTaskClick={setSelectedTask}
               />
             ))}
           </div>
+        )}
+
+        {/* Detay Modalı Koşullu Render Yapısı */}
+        {selectedTask && (
+          <TaskModal 
+            task={selectedTask} 
+            onClose={() => setSelectedTask(null)} 
+            onUpdate={handleUpdateDescription}
+          />
         )}
       </main>
     </DndContext>
