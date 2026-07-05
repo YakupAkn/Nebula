@@ -1,21 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Column } from "@/components/Column";
+import { supabase } from "@/lib/supabase"; // Supabase bağlantımızı import ettik
 
 const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
 
-export default function Home() {
-  const [tasks, setTasks] = useState([
-    { id: "1", title: "Ön Değerlendirme Raporu Taslağı", status: "Yapılacaklar", tag: "Rapor" },
-    { id: "2", title: "Motor Sürücü Devresi PCB Çizimi", status: "Yapılacaklar", tag: "Donanım" },
-    { id: "3", title: "Görüntü İşleme Algoritması Optimizasyonu", status: "Devam Edenler", tag: "Yazılım" },
-  ]);
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  tag: string;
+}
 
-  // Yeni görev ekleme state'leri
+export default function Home() {
+  // Başlangıçta boş bir dizi ile başlıyoruz
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
+  const [loading, setLoading] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -23,23 +27,71 @@ export default function Home() {
     })
   );
 
-  // Yeni Görev Ekleme Fonksiyonu
-  const handleAddTask = (e: React.FormEvent) => {
+  // 1. Supabase'den Görevleri Çekme Fonksiyonu
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      // Supabase'deki id'ler sayı (bigint) gelebilir, dnd-kit string beklediği için string'e çeviriyoruz
+      const formattedTasks = (data || []).map((task: any) => ({
+        ...task,
+        id: task.id.toString(),
+      }));
+
+      setTasks(formattedTasks);
+    } catch (error) {
+      console.error("Görevler yüklenirken hata oluştu:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sayfa ilk açıldığında verileri çek
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  // 2. Supabase'e Yeni Görev Ekleme Fonksiyonu
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const newTask = {
-      id: Date.now().toString(), // Benzersiz geçici ID
-      title: newTitle,
-      status: "Yapılacaklar", // Yeni işler her zaman buradan başlar
-      tag: newTag,
-    };
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert([
+          {
+            title: newTitle,
+            status: "Yapılacaklar",
+            tag: newTag,
+          },
+        ])
+        .select();
 
-    setTasks([...tasks, newTask]);
-    setNewTitle(""); // Inputu temizle
+      if (error) throw error;
+
+      if (data && data[0]) {
+        const newTask = {
+          ...data[0],
+          id: data[0].id.toString(),
+        };
+        setTasks([...tasks, newTask]);
+      }
+      
+      setNewTitle("");
+    } catch (error) {
+      console.error("Görev eklenirken hata oluştu:", error);
+    }
   };
 
-  const handleDragEnd = (event: any) => {
+  // 3. Sürükle Bırak Bittiğinde Supabase'i Güncelleme Fonksiyonu
+  const handleDragEnd = async (event: any) => {
     const { active, over } = event;
     if (!over) return;
 
@@ -48,38 +100,55 @@ export default function Home() {
 
     if (activeId === overId) return;
 
+    // Arayüzün donmaması için önce yerel state'i (UI) anında güncelleyelim (Optimistic Update)
+    let updatedStatus = "";
+    
     setTasks((prevTasks) => {
       const activeIndex = prevTasks.findIndex((t) => t.id === activeId);
+      if (activeIndex === -1) return prevTasks;
+
+      const newTasks = [...prevTasks];
 
       if (COLUMNS.includes(overId)) {
-        const newTasks = [...prevTasks];
+        updatedStatus = overId;
         newTasks[activeIndex].status = overId;
         return newTasks;
       }
 
       const overIndex = prevTasks.findIndex((t) => t.id === overId);
       if (overIndex !== -1) {
-        const newTasks = [...prevTasks];
-        newTasks[activeIndex].status = newTasks[overIndex].status;
+        updatedStatus = newTasks[overIndex].status;
+        newTasks[activeIndex].status = updatedStatus;
         return arrayMove(newTasks, activeIndex, overIndex);
       }
 
       return prevTasks;
     });
+
+    // Şimdi arka planda Supabase veritabanını güncelleyelim
+    if (updatedStatus) {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: updatedStatus })
+        .eq("id", parseInt(activeId)); // string id'yi veritabanındaki bigint için sayıya çevirdik
+
+      if (error) {
+        console.error("Veritabanı güncellenirken hata oluştu, veriler geri çekiliyor...");
+        fetchTasks(); // Hata varsa veritabanındaki orijinal hali geri yükle
+      }
+    }
   };
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
       <main className="p-10 bg-[#f8fafc] min-h-screen font-sans">
         
-        {/* Üst Alan: Başlık ve Hızlı Görev Ekleme Formu */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-4">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Nebula</h1>
             <p className="text-slate-500 mt-1 font-medium">Proje ve Takım Yönetim Paneli</p>
           </div>
 
-          {/* Hızlı Ekleme Formu */}
           <form onSubmit={handleAddTask} className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
             <input
               type="text"
@@ -105,16 +174,22 @@ export default function Home() {
             </button>
           </form>
         </div>
-        {/* Kanban Sütunları */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {COLUMNS.map((colTitle) => (
-            <Column 
-              key={colTitle} 
-              title={colTitle} 
-              tasks={tasks.filter((t) => t.status === colTitle)} 
-            />
-          ))}
-        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <p className="text-slate-500 font-medium animate-pulse">Nebula yükleniyor...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {COLUMNS.map((colTitle) => (
+              <Column 
+                key={colTitle} 
+                title={colTitle} 
+                tasks={tasks.filter((t) => t.status === colTitle)} 
+              />
+            ))}
+          </div>
+        )}
       </main>
     </DndContext>
   );
