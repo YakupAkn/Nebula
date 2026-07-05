@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Nebula",
-  description: "Nabula, Görev Yönetimi",
+  description: "Nebula, Görev Yönetimi", // Nabula yazım hatası da düzeltildi :)
 };
 
 export default function RootLayout({
@@ -29,10 +29,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Google Analytics Ana Script'i */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-X1BB1FB0MZ"
           strategy="afterInteractive"
         />
+        
+        {/* Güvenli Çalıştırma Ayarı */}
         <Script id="google-analytics" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
@@ -41,6 +44,7 @@ export default function RootLayout({
             gtag('config', 'G-X1BB1FB0MZ');
           `}
         </Script>
+
         {children}
       </body>
     </html>
