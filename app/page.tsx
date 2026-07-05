@@ -3,7 +3,9 @@ import { useState, useEffect } from "react";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Column } from "../components/Column";
 import { TaskModal } from "../components/TaskModal";
+import { Login } from "../components/Login";
 import { supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
 
@@ -21,6 +23,8 @@ interface Task {
 }
 
 export default function Home() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
@@ -50,6 +54,25 @@ export default function Home() {
   };
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+
     fetchTasks();
 
     const channel = supabase
@@ -66,7 +89,11 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [session]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +230,18 @@ export default function Home() {
       .eq("id", parseInt(activeId));
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
+        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Login />;
+  }
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
       <main className="p-8 md:p-12 bg-[#fafafa] min-h-screen font-sans">
@@ -216,6 +255,16 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
+            <span className="hidden md:block text-xs text-slate-400 font-medium mr-1">
+              {session.user.email}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-3 py-2 rounded-lg hover:bg-rose-50 transition-all"
+              title="Çıkış Yap"
+            >
+              Çıkış Yap
+            </button>
             {isFormOpen && (
               <form
                 onSubmit={handleAddTask}
