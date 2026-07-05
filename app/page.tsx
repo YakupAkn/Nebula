@@ -3,6 +3,9 @@ import { useState, useEffect } from "react";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Column } from "../components/Column";
 import { TaskModal } from "../components/TaskModal";
+import { OrgSetup } from "../components/OrgSetup";
+import { ProjectSetup } from "../components/ProjectSetup";
+import { OrgMembers } from "../components/OrgMembers";
 import { Login } from "../components/Login";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
@@ -25,6 +28,10 @@ interface Task {
 export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [orgCheckLoading, setOrgCheckLoading] = useState(true);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [showOrgMembers, setShowOrgMembers] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
@@ -42,9 +49,11 @@ export default function Home() {
   );
 
   const fetchTasks = async () => {
+    if (!projectId) return;
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
+      .eq("project_id", projectId)
       .order("position", { ascending: true });
 
     if (!error && data) {
@@ -70,16 +79,39 @@ export default function Home() {
     };
   }, []);
 
+  const checkOrganization = async (userId: string) => {
+    setOrgCheckLoading(true);
+    const { data, error } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      setOrganizationId(data.organization_id);
+    } else {
+      setOrganizationId(null);
+    }
+    setOrgCheckLoading(false);
+  };
+
   useEffect(() => {
-    if (!session) return;
+    if (session) {
+      checkOrganization(session.user.id);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || !organizationId || !projectId) return;
 
     fetchTasks();
 
     const channel = supabase
-      .channel("realtime-tasks")
+      .channel(`realtime-tasks-${projectId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
+        { event: "*", schema: "public", table: "tasks", filter: `project_id=eq.${projectId}` },
         () => {
           fetchTasks();
         }
@@ -89,7 +121,7 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session]);
+  }, [session, organizationId, projectId]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -115,6 +147,7 @@ export default function Home() {
         position: maxPosition + 1000,
         assignee: newAssignee,
         due_date: newDueDate || null,
+        project_id: projectId,
       },
     ]);
     setNewTitle("");
@@ -242,6 +275,33 @@ export default function Home() {
     return <Login />;
   }
 
+  if (orgCheckLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
+        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!organizationId) {
+    return (
+      <OrgSetup
+        session={session}
+        onOrgCreated={() => checkOrganization(session.user.id)}
+      />
+    );
+  }
+
+  if (!projectId) {
+    return (
+      <ProjectSetup
+        session={session}
+        organizationId={organizationId}
+        onProjectSelected={setProjectId}
+      />
+    );
+  }
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
       <main className="p-8 md:p-12 bg-[#fafafa] min-h-screen font-sans">
@@ -253,18 +313,38 @@ export default function Home() {
             </h1>
             <p className="text-slate-500 text-sm mt-1 font-medium">Ekip görev akışını eş zamanlı takip edin.</p>
           </div>
+<div className="flex items-center gap-3">
+            {/* Form açık değilse bu butonları ve e-postayı göster */}
+            {!isFormOpen && (
+              <>
+                <button
+                  onClick={() => setProjectId(null)}
+                  className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
+                  title="Proje Değiştir"
+                >
+                  Projeler
+                </button>
+                <button
+                  onClick={() => setShowOrgMembers(true)}
+                  className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
+                  title="Üye Ekle"
+                >
+                  Üye Ekle
+                </button>
+                <span className="hidden md:block text-xs text-slate-400 font-medium mr-1">
+                  {session.user.email}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-3 py-2 rounded-lg hover:bg-rose-50 transition-all"
+                  title="Çıkış Yap"
+                >
+                  Çıkış Yap
+                </button>
+              </>
+            )}
 
-          <div className="flex items-center gap-3">
-            <span className="hidden md:block text-xs text-slate-400 font-medium mr-1">
-              {session.user.email}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-3 py-2 rounded-lg hover:bg-rose-50 transition-all"
-              title="Çıkış Yap"
-            >
-              Çıkış Yap
-            </button>
+            {/* Form açıksa görev ekleme panelini göster */}
             {isFormOpen && (
               <form
                 onSubmit={handleAddTask}
@@ -311,6 +391,7 @@ export default function Home() {
               </form>
             )}
 
+            {/* Formu açıp kapatan artı (+) butonu her zaman kalır */}
             <button
               type="button"
               onClick={() => setIsFormOpen(!isFormOpen)}
@@ -353,6 +434,13 @@ export default function Home() {
             onClose={() => setSelectedTask(null)}
             onUpdate={handleUpdateDescription}
             onUpdateMeta={handleUpdateMeta}
+          />
+        )}
+
+        {showOrgMembers && organizationId && (
+          <OrgMembers
+            organizationId={organizationId}
+            onClose={() => setShowOrgMembers(false)}
           />
         )}
       </main>
