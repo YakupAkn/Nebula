@@ -1,12 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
 import { Column } from "../components/Column";
 import { TaskModal } from "../components/TaskModal";
 import { supabase } from "@/lib/supabase";
 
 const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
+
+export const TEAM_MEMBERS = ["Yakup", "Erman", "Ömer Faruk"];
 
 interface Task {
   id: string;
@@ -14,16 +15,20 @@ interface Task {
   status: string;
   tag: string;
   description: string | null;
+  position: number;
+  due_date: string | null;
+  assignee: string | null;
 }
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
+  const [newAssignee, setNewAssignee] = useState(TEAM_MEMBERS[0]);
+  const [newDueDate, setNewDueDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  
-  // Seçili kart detayını tutan yeni state yapısı
+
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
@@ -36,7 +41,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
-      .order("id", { ascending: true });
+      .order("position", { ascending: true });
 
     if (!error && data) {
       setTasks(data.map((t: any) => ({ ...t, id: t.id.toString() })));
@@ -51,9 +56,9 @@ export default function Home() {
       .channel("realtime-tasks")
       .on(
         "postgres_changes",
-        { event: "*", scheme: "public", table: "tasks" },
+        { event: "*", schema: "public", table: "tasks" },
         () => {
-          fetchTasks(); 
+          fetchTasks();
         }
       )
       .subscribe();
@@ -69,10 +74,24 @@ export default function Home() {
 
     setIsFormOpen(false);
 
+    const columnTasks = tasks.filter((t) => t.status === "Yapılacaklar");
+    const maxPosition = columnTasks.length > 0
+      ? Math.max(...columnTasks.map((t) => t.position))
+      : 0;
+
     await supabase.from("tasks").insert([
-      { title: newTitle, status: "Yapılacaklar", tag: newTag, description: "" },
+      {
+        title: newTitle,
+        status: "Yapılacaklar",
+        tag: newTag,
+        description: "",
+        position: maxPosition + 1000,
+        assignee: newAssignee,
+        due_date: newDueDate || null,
+      },
     ]);
     setNewTitle("");
+    setNewDueDate("");
   };
 
   const handleDeleteTask = async (id: string) => {
@@ -81,12 +100,11 @@ export default function Home() {
     if (error) fetchTasks();
   };
 
-  // Açıklama alanını veritabanında güncelleyen fonksiyon
   const handleUpdateDescription = async (id: string, description: string) => {
     setTasks((prevTasks) =>
       prevTasks.map((t) => (t.id === id ? { ...t, description } : t))
     );
-    
+
     if (selectedTask && selectedTask.id === id) {
       setSelectedTask({ ...selectedTask, description });
     }
@@ -94,6 +112,26 @@ export default function Home() {
     const { error } = await supabase
       .from("tasks")
       .update({ description })
+      .eq("id", parseInt(id));
+
+    if (error) fetchTasks();
+  };
+
+  const handleUpdateMeta = async (
+    id: string,
+    updates: { due_date?: string | null; assignee?: string | null }
+  ) => {
+    setTasks((prevTasks) =>
+      prevTasks.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
+
+    if (selectedTask && selectedTask.id === id) {
+      setSelectedTask({ ...selectedTask, ...updates });
+    }
+
+    const { error } = await supabase
+      .from("tasks")
+      .update(updates)
       .eq("id", parseInt(id));
 
     if (error) fetchTasks();
@@ -108,42 +146,67 @@ export default function Home() {
 
     if (activeId === overId) return;
 
-    let updatedStatus = "";
+    const activeTask = tasks.find((t) => t.id === activeId);
+    if (!activeTask) return;
 
-    setTasks((prevTasks) => {
-      const activeIndex = prevTasks.findIndex((t) => t.id === activeId);
-      if (activeIndex === -1) return prevTasks;
+    const isOverColumn = COLUMNS.includes(overId);
+    const targetStatus = isOverColumn
+      ? overId
+      : tasks.find((t) => t.id === overId)?.status;
 
-      const newTasks = [...prevTasks];
+    if (!targetStatus) return;
 
-      if (COLUMNS.includes(overId)) {
-        updatedStatus = overId;
-        newTasks[activeIndex].status = overId;
-        return newTasks;
+    const columnTasks = tasks
+      .filter((t) => t.status === targetStatus && t.id !== activeId)
+      .sort((a, b) => a.position - b.position);
+
+    let newPosition: number;
+
+    if (isOverColumn) {
+      const maxPos = columnTasks.length > 0
+        ? Math.max(...columnTasks.map((t) => t.position))
+        : 0;
+      newPosition = maxPos + 1000;
+    } else {
+      const overIndex = columnTasks.findIndex((t) => t.id === overId);
+
+      if (overIndex === -1) {
+        const maxPos = columnTasks.length > 0
+          ? Math.max(...columnTasks.map((t) => t.position))
+          : 0;
+        newPosition = maxPos + 1000;
+      } else {
+        const prevTask = columnTasks[overIndex - 1];
+        const nextTask = columnTasks[overIndex];
+
+        if (prevTask && nextTask) {
+          newPosition = (prevTask.position + nextTask.position) / 2;
+        } else if (!prevTask && nextTask) {
+          newPosition = nextTask.position / 2;
+        } else {
+          newPosition = nextTask.position + 1000;
+        }
       }
-
-      const overIndex = prevTasks.findIndex((t) => t.id === overId);
-      if (overIndex !== -1) {
-        updatedStatus = newTasks[overIndex].status;
-        newTasks[activeIndex].status = updatedStatus;
-        return arrayMove(newTasks, activeIndex, overIndex);
-      }
-
-      return prevTasks;
-    });
-
-    if (updatedStatus) {
-      await supabase
-        .from("tasks")
-        .update({ status: updatedStatus })
-        .eq("id", parseInt(activeId));
     }
+
+    setTasks((prevTasks) =>
+      prevTasks.map((t) =>
+        t.id === activeId
+          ? { ...t, status: targetStatus, position: newPosition }
+          : t
+      )
+    );
+
+    await supabase
+      .from("tasks")
+      .update({ status: targetStatus, position: newPosition })
+      .eq("id", parseInt(activeId));
   };
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
       <main className="p-8 md:p-12 bg-[#fafafa] min-h-screen font-sans">
-        
+
         <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-8 mb-8 border-b border-slate-200 gap-6">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -154,16 +217,16 @@ export default function Home() {
 
           <div className="flex items-center gap-3">
             {isFormOpen && (
-              <form 
-                onSubmit={handleAddTask} 
-                className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm transition-all duration-300 animate-in fade-in zoom-in-95"
+              <form
+                onSubmit={handleAddTask}
+                className="flex flex-wrap items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm transition-all duration-300 animate-in fade-in zoom-in-95"
               >
                 <input
                   type="text"
                   placeholder="Yapılacak bir iş yazın..."
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="px-4 py-2 text-sm bg-slate-50/50 rounded-lg focus:outline-none w-60 text-slate-800 border border-slate-200 focus:border-indigo-500"
+                  className="px-4 py-2 text-sm bg-slate-50/50 rounded-lg focus:outline-none w-56 text-slate-800 border border-slate-200 focus:border-indigo-500"
                   autoFocus
                 />
                 <select
@@ -175,6 +238,21 @@ export default function Home() {
                   <option value="Donanım">Donanım</option>
                   <option value="Rapor">Rapor</option>
                 </select>
+                <select
+                  value={newAssignee}
+                  onChange={(e) => setNewAssignee(e.target.value)}
+                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
+                >
+                  {TEAM_MEMBERS.map((member) => (
+                    <option key={member} value={member}>{member}</option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
+                />
                 <button
                   type="submit"
                   className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
@@ -209,10 +287,10 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {COLUMNS.map((colTitle) => (
-              <Column 
-                key={colTitle} 
-                title={colTitle} 
-                tasks={tasks.filter((t) => t.status === colTitle)} 
+              <Column
+                key={colTitle}
+                title={colTitle}
+                tasks={tasks.filter((t) => t.status === colTitle)}
                 onDeleteTask={handleDeleteTask}
                 onTaskClick={setSelectedTask}
               />
@@ -220,12 +298,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* Detay Modalı Koşullu Render Yapısı */}
         {selectedTask && (
-          <TaskModal 
-            task={selectedTask} 
-            onClose={() => setSelectedTask(null)} 
+          <TaskModal
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
             onUpdate={handleUpdateDescription}
+            onUpdateMeta={handleUpdateMeta}
           />
         )}
       </main>

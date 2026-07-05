@@ -7,12 +7,26 @@ interface Task {
   status: string;
   tag: string;
   description: string | null;
+  due_date: string | null;
+  assignee: string | null;
 }
 
 interface TaskCardProps {
   task: Task;
   onDelete: (id: string) => void;
   onTaskClick: (task: Task) => void;
+}
+
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr + "T00:00:00");
+  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
+}
+
+function isOverdue(dateStr: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(dateStr + "T00:00:00");
+  return date < today;
 }
 
 export function TaskCard({ task, onDelete, onTaskClick }: TaskCardProps) {
@@ -33,6 +47,8 @@ export function TaskCard({ task, onDelete, onTaskClick }: TaskCardProps) {
     "Yazılım": "bg-indigo-50 text-indigo-700 border border-indigo-200",
   };
 
+  const overdue = task.due_date ? isOverdue(task.due_date) : false;
+
   return (
     <div
       ref={setNodeRef}
@@ -46,10 +62,10 @@ export function TaskCard({ task, onDelete, onTaskClick }: TaskCardProps) {
         <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${tagColors[task.tag] || "bg-slate-100 text-slate-700"}`}>
           {task.tag}
         </span>
-        
+
         <button
           onClick={(e) => {
-            e.stopPropagation(); // Modalı açmasın diye tıklama olayını üst elemente aktarmıyoruz
+            e.stopPropagation();
             if(confirm("Bu görevi silmek istediğine emin misin?")) onDelete(task.id);
           }}
           className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 p-1 rounded-md hover:bg-rose-50 transition-all duration-200"
@@ -60,7 +76,7 @@ export function TaskCard({ task, onDelete, onTaskClick }: TaskCardProps) {
           </svg>
         </button>
       </div>
-      
+
       <div className="w-full h-full pointer-events-none">
         <h3 className="font-medium text-slate-800 text-[14px] leading-snug tracking-tight">
           {task.title}
@@ -69,6 +85,27 @@ export function TaskCard({ task, onDelete, onTaskClick }: TaskCardProps) {
           <p className="text-slate-400 text-xs mt-1.5 line-clamp-2 leading-relaxed">
             {task.description}
           </p>
+        )}
+
+        {(task.assignee || task.due_date) && (
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
+            {task.assignee ? (
+              <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold">
+                  {task.assignee.charAt(0)}
+                </span>
+                {task.assignee}
+              </span>
+            ) : <span />}
+
+            {task.due_date && (
+              <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${
+                overdue ? "bg-rose-50 text-rose-600" : "bg-slate-100 text-slate-500"
+              }`}>
+                {formatDate(task.due_date)}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>
