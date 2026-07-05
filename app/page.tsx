@@ -1,65 +1,121 @@
-import Image from "next/image";
+"use client";
+import { useState } from "react";
+import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
+import { Column } from "@/components/Column";
+
+const COLUMNS = ["Yapılacaklar", "Devam Edenler", "Tamamlananlar"];
 
 export default function Home() {
+  const [tasks, setTasks] = useState([
+    { id: "1", title: "Ön Değerlendirme Raporu Taslağı", status: "Yapılacaklar", tag: "Rapor" },
+    { id: "2", title: "Motor Sürücü Devresi PCB Çizimi", status: "Yapılacaklar", tag: "Donanım" },
+    { id: "3", title: "Görüntü İşleme Algoritması Optimizasyonu", status: "Devam Edenler", tag: "Yazılım" },
+  ]);
+
+  // Yeni görev ekleme state'leri
+  const [newTitle, setNewTitle] = useState("");
+  const [newTag, setNewTag] = useState("Yazılım");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    })
+  );
+
+  // Yeni Görev Ekleme Fonksiyonu
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+
+    const newTask = {
+      id: Date.now().toString(), // Benzersiz geçici ID
+      title: newTitle,
+      status: "Yapılacaklar", // Yeni işler her zaman buradan başlar
+      tag: newTag,
+    };
+
+    setTasks([...tasks, newTask]);
+    setNewTitle(""); // Inputu temizle
+  };
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id;
+    const overId = over.id;
+
+    if (activeId === overId) return;
+
+    setTasks((prevTasks) => {
+      const activeIndex = prevTasks.findIndex((t) => t.id === activeId);
+
+      if (COLUMNS.includes(overId)) {
+        const newTasks = [...prevTasks];
+        newTasks[activeIndex].status = overId;
+        return newTasks;
+      }
+
+      const overIndex = prevTasks.findIndex((t) => t.id === overId);
+      if (overIndex !== -1) {
+        const newTasks = [...prevTasks];
+        newTasks[activeIndex].status = newTasks[overIndex].status;
+        return arrayMove(newTasks, activeIndex, overIndex);
+      }
+
+      return prevTasks;
+    });
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+      <main className="p-10 bg-[#f8fafc] min-h-screen font-sans">
+        
+        {/* Üst Alan: Başlık ve Hızlı Görev Ekleme Formu */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-4">
+          <div>
+            <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Nebula</h1>
+            <p className="text-slate-500 mt-1 font-medium">Proje ve Takım Yönetim Paneli</p>
+          </div>
+
+          {/* Hızlı Ekleme Formu */}
+          <form onSubmit={handleAddTask} className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+            <input
+              type="text"
+              placeholder="Yeni görev adı..."
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 w-64 text-slate-800"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <select
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-700"
+            >
+              <option value="Yazılım">Yazılım</option>
+              <option value="Donanım">Donanım</option>
+              <option value="Rapor">Rapor</option>
+            </select>
+            <button
+              type="submit"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              Ekle
+            </button>
+          </form>
+        </div>
+        {/* Kanban Sütunları */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {COLUMNS.map((colTitle) => (
+            <Column 
+              key={colTitle} 
+              title={colTitle} 
+              tasks={tasks.filter((t) => t.status === colTitle)} 
+            />
+          ))}
         </div>
       </main>
-    </div>
+    </DndContext>
   );
 }
