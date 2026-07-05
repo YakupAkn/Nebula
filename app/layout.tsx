@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes"; // Temayı sarmalamak için gerekli
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Nebula",
-  description: "Nebula, Görev Yönetimi", // Nabula yazım hatası da düzeltildi :)
+  description: "Nebula, Görev Yönetimi",
 };
 
 export default function RootLayout({
@@ -27,25 +28,25 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning // Tema geçişlerinde hydration hatasını önlemek için önemlidir
     >
       <body className="min-h-full flex flex-col">
-        {/* Google Analytics Ana Script'i */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-X1BB1FB0MZ"
-          strategy="afterInteractive"
-        />
-        
-        {/* Güvenli Çalıştırma Ayarı */}
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-X1BB1FB0MZ');
-          `}
-        </Script>
-
-        {children}
+        {/* Tema sağlayıcıyı buraya ekliyoruz */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <Script
+            src="https://www.googletagmanager.com/gtag/js?id=G-X1BB1FB0MZ"
+            strategy="afterInteractive"
+          />
+          <Script id="google-analytics" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-X1BB1FB0MZ');
+            `}
+          </Script>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
