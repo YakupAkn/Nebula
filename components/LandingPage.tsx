@@ -1,12 +1,25 @@
-import React from 'react';
-import { useTheme } from './ThemeProvider';
+import React, { useEffect, useState } from 'react';
 
 interface LandingPageProps {
   onStart: () => void;
 }
 
 export default function LandingPage({ onStart }: LandingPageProps) {
-  const { isDark, toggleTheme } = useTheme();
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      setIsDark(savedTheme === 'dark');
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark);
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
+
+  const toggleTheme = () => setIsDark((prev) => !prev);
 
   return (
     <div className={`min-h-screen font-sans transition-colors duration-300 ${isDark ? 'bg-black text-white' : 'bg-zinc-50 text-zinc-900'}`}>
