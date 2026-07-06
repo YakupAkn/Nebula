@@ -1,3 +1,48 @@
+# Birleştirilmiş Dosyalar Raporu
+
+**Toplam Dosya Sayısı:** 2
+---
+
+## 1. Dosya: layout.tsx
+**Tam Yol Dizini:** `C:/Users/yakup/Şablonlar/nebula/app/layout.tsx`
+
+### Dosya İçeriği:
+```tsx
+import type { Metadata } from "next";
+import Script from "next/script";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Nebula",
+  description: "Nebula, Görev Yönetimi",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col">
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-X1BB1FB0MZ" strategy="afterInteractive" />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-X1BB1FB0MZ');`}
+        </Script>
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+## 2. Dosya: page.tsx
+**Tam Yol Dizini:** `C:/Users/yakup/Şablonlar/nebula/app/page.tsx`
+
+### Dosya İçeriği:
+```tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -11,6 +56,7 @@ import { OrgMembers } from "../components/OrgMembers";
 import { Login } from "../components/Login";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
+import AssigneeDropdown from "../components/AssigneeDropdown";
 
 // Vercel çökme hatasını önlemek için LandingPage'i SSR olmadan içeri aktarıyoruz
 const LandingPageWithoutSSR = dynamic(() => import("../components/LandingPage"), {
@@ -429,36 +475,29 @@ export default function Home() {
                 <select
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
+                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium h-[42px]"
                 >
                   <option value="Yazılım">Yazılım</option>
                   <option value="Donanım">Donanım</option>
                   <option value="Rapor">Rapor</option>
                 </select>
-                <select
-                  value={newAssignee || session?.user.email || ""}
-                  onChange={(e) => setNewAssignee(e.target.value)}
-                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
-                >
-                  {orgMembers.length === 0 ? (
-                    <option value={session?.user.email ?? ""}>{session?.user.email ?? "Ben"}</option>
-                  ) : (
-                    orgMembers.map((email) => (
-                      <option key={email} value={email}>
-                        {email.split("@")[0]}
-                      </option>
-                    ))
-                  )}
-                </select>
+
+                <div className="w-56 -mt-6">
+                  <AssigneeDropdown
+                    organizationId={organizationId!}
+                    currentAssigneeId={newAssignee || null}
+                    onAssign={(id) => setNewAssignee(id || "")}
+                  />
+                </div>
                 <input
                   type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
-                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
+                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium h-[42px]"
                 />
                 <button
                   type="submit"
-                  className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
+                  className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all h-[42px]"
                 >
                   Görev Oluştur
                 </button>
@@ -522,3 +561,7 @@ export default function Home() {
     </DndContext>
   );
 }
+```
+
+---
+
