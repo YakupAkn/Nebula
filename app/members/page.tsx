@@ -28,20 +28,13 @@ export default function MembersPage() {
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [newRole, setNewRole] = useState("Üye");
-  
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Sabit bir organizasyon ID'si varsayıyoruz. 
-  // (Eğer dinamikse bunu Context'ten veya URL'den almalısın)
   const CURRENT_ORG_ID = "ad8efd6b-2e0a-4ef6-a563-db1674073e69";
-
   useEffect(() => {
     fetchMembers();
     fetchSystemUsers();
   }, []);
-
-  // 1. Mevcut Organizasyon Üyelerini Çek (Profiles tablosuyla JOIN yaparak)
   const fetchMembers = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
@@ -61,13 +54,10 @@ export default function MembersPage() {
       setErrorMessage("Üyeler yüklenirken hata oluştu.");
       console.error(error);
     } else {
-      // Supabase'den gelen veriyi tipe uygun hale getiriyoruz
       setMembers(data as unknown as OrgMember[]);
     }
     setIsLoading(false);
   };
-
-  // 2. Sisteme Kayıtlı Tüm Kullanıcıları Çek (Yeni üye seçimi için)
   const fetchSystemUsers = async () => {
     const { data, error } = await supabase
       .from("profiles")
