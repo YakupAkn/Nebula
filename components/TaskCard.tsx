@@ -9,6 +9,7 @@ interface Task {
   description: string | null;
   due_date: string | null;
   assignee: string | null;
+  priority?: string;
 }
 
 interface TaskCardProps {
@@ -56,12 +57,25 @@ export function TaskCard({ task, onDelete, onTaskClick }: TaskCardProps) {
       {...attributes}
       {...listeners}
       onClick={() => onTaskClick(task)}
-      className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-400/50 transition-all cursor-grab active:cursor-grabbing group relative select-none"
+      className="bg-white p-4 pl-5 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-400/50 transition-all cursor-grab active:cursor-grabbing group relative select-none overflow-hidden"
     >
+      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+        task.priority === "High" ? "bg-rose-500" :
+        task.priority === "Low" ? "bg-emerald-400" : "bg-amber-400"
+      }`} />
       <div className="flex justify-between items-center mb-3">
-        <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${tagColors[task.tag] || "bg-slate-100 text-slate-700"}`}>
-          {task.tag}
-        </span>
+        <div className="flex gap-1.5 items-center">
+          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${tagColors[task.tag] || "bg-slate-100 text-slate-700"}`}>
+            {task.tag}
+          </span>
+          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+            task.priority === "High" ? "bg-rose-50 text-rose-600 border border-rose-100" :
+            task.priority === "Low" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
+            "bg-amber-50 text-amber-600 border border-amber-100"
+          }`}>
+            {task.priority || "Medium"}
+          </span>
+        </div>
 
         <button
           onClick={(e) => {

@@ -7,6 +7,7 @@ interface Task {
   description: string | null;
   due_date: string | null;
   assignee: string | null;
+  priority?: string;
 }
 
 interface TaskModalProps {
@@ -15,7 +16,7 @@ interface TaskModalProps {
   onUpdate: (id: string, description: string) => void;
   onUpdateMeta: (
     id: string,
-    updates: { due_date?: string | null; assignee?: string | null }
+    updates: { due_date?: string | null; assignee?: string | null; priority?: string }
   ) => void;
   orgMembers: string[];
 }
@@ -41,7 +42,7 @@ export function TaskModal({ task, onClose, onUpdate, onUpdateMeta, orgMembers }:
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Atanan Kişi</label>
             <select
@@ -74,6 +75,19 @@ export function TaskModal({ task, onClose, onUpdate, onUpdateMeta, orgMembers }:
               onChange={(e) => onUpdateMeta(task.id, { due_date: e.target.value || null })}
               className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm text-slate-800 bg-slate-50/50"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Öncelik</label>
+            <select
+              value={task.priority || "Medium"}
+              onChange={(e) => onUpdateMeta(task.id, { priority: e.target.value })}
+              className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm text-slate-800 bg-slate-50/50 cursor-pointer"
+            >
+              <option value="Low">Low (Düşük)</option>
+              <option value="Medium">Medium (Orta)</option>
+              <option value="High">High (Yüksek)</option>
+            </select>
           </div>
         </div>
 

@@ -29,6 +29,7 @@ interface Task {
   position: number;
   due_date: string | null;
   assignee: string | null;
+  priority: string;
 }
 
 interface SupabaseTask extends Omit<Task, "id"> {
@@ -45,6 +46,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
+  const [newPriority, setNewPriority] = useState("Medium");
   const [newAssignee, setNewAssignee] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [loading, setLoading] = useState(true);
@@ -211,11 +213,13 @@ export default function Home() {
         position: maxPosition + 1000,
         assignee: newAssignee || session?.user?.email || null,
         due_date: newDueDate || null,
+        priority: newPriority,
         project_id: projectId,
       },
     ]);
     setNewTitle("");
     setNewDueDate("");
+    setNewPriority("Medium");
   };
 
   const handleDeleteTask = async (id: string) => {
@@ -243,7 +247,7 @@ export default function Home() {
 
   const handleUpdateMeta = async (
     id: string,
-    updates: { due_date?: string | null; assignee?: string | null }
+    updates: { due_date?: string | null; assignee?: string | null; priority?: string }
   ) => {
     setTasks((prevTasks) =>
       prevTasks.map((t) => (t.id === id ? { ...t, ...updates } : t))
@@ -450,6 +454,18 @@ export default function Home() {
                     ))
                   )}
                 </select>
+                <div className="w-36">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Öncelik</label>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm bg-white"
+                  >
+                    <option value="Low">Düşük (Low)</option>
+                    <option value="Medium">Orta (Medium)</option>
+                    <option value="High">Yüksek (High)</option>
+                  </select>
+                </div>
                 <input
                   type="date"
                   value={newDueDate}
