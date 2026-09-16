@@ -224,7 +224,7 @@ export default function Home() {
 
   const handleDeleteTask = async (id: string) => {
     setTasks((prevTasks) => prevTasks.filter((t) => t.id !== id));
-    const { error } = await supabase.from("tasks").delete().eq("id", parseInt(id));
+    const { error } = await supabase.from("tasks").delete().eq("id", id);
     if (error) fetchTasks();
   };
 
@@ -240,7 +240,7 @@ export default function Home() {
     const { error } = await supabase
       .from("tasks")
       .update({ description })
-      .eq("id", parseInt(id));
+      .eq("id", id);
 
     if (error) fetchTasks();
   };
@@ -260,7 +260,7 @@ export default function Home() {
     const { error } = await supabase
       .from("tasks")
       .update(updates)
-      .eq("id", parseInt(id));
+      .eq("id", id);
 
     if (error) fetchTasks();
   };
@@ -328,7 +328,7 @@ export default function Home() {
     await supabase
       .from("tasks")
       .update({ status: targetStatus, position: newPosition })
-      .eq("id", parseInt(activeId));
+      .eq("id", activeId);
   };
 
   if (authLoading) {

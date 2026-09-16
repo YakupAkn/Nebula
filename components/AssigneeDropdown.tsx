@@ -1,13 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { maskEmail, getInitials } from "@/utils/user";
+import { getInitials } from "@/utils/user";
 
 interface MemberProfile {
   id: string;
   full_name: string;
   avatar_url: string | null;
-  email?: string; // Gösterim için mock veya ilişkili tablodan gelen email
 }
 
 interface AssigneeDropdownProps {
@@ -52,11 +51,10 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
 
       if (error) throw error;
 
-      const formattedMembers: MemberProfile[] = (data || []).map((m: any) => ({
+      const formattedMembers: MemberProfile[] = (data || []).map((m) => ({
         id: m.profiles?.id,
         full_name: m.profiles?.full_name || "Bilinmeyen Üye",
-        avatar_url: m.profiles?.avatar_url,
-        email: "user" + m.user_id.slice(0, 3) + "@company.com" // Projenizdeki gerçek email alanıyla değiştirilebilir
+        avatar_url: m.profiles?.avatar_url
       }));
 
       setMembers(formattedMembers);
@@ -143,7 +141,7 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
                   {member.full_name}
                 </p>
                 <p className="text-[10px] text-zinc-500 truncate">
-                  {maskEmail(member.email || "")}
+                  Organizasyon üyesi
                 </p>
               </div>
             </button>

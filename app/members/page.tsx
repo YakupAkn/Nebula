@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import type { Session } from "@supabase/supabase-js";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -30,12 +31,34 @@ export default function MembersPage() {
   const [newRole, setNewRole] = useState("Üye");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const CURRENT_ORG_ID = "ad8efd6b-2e0a-4ef6-a563-db1674073e69";
+  const [, setSession] = useState<Session | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
   useEffect(() => {
-    fetchMembers();
-    fetchSystemUsers();
+    const initialize = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", session.user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        setErrorMessage("Organizasyon kontrolünde hata oluştu.");
+        console.error(error);
+        return;
+      }
+
+      setOrganizationId(data?.organization_id ?? null);
+    };
+
+    initialize();
   }, []);
   const fetchMembers = async () => {
+    if (!organizationId) return;
     setIsLoading(true);
     const { data, error } = await supabase
       .from("organization_members")
@@ -48,7 +71,7 @@ export default function MembersPage() {
           avatar_url
         )
       `)
-      .eq("organization_id", CURRENT_ORG_ID);
+      .eq("organization_id", organizationId);
 
     if (error) {
       setErrorMessage("Üyeler yüklenirken hata oluştu.");
@@ -58,6 +81,12 @@ export default function MembersPage() {
     }
     setIsLoading(false);
   };
+  useEffect(() => {
+    if (!organizationId) return;
+    fetchMembers();
+    fetchSystemUsers();
+  }, [organizationId]);
+
   const fetchSystemUsers = async () => {
     const { data, error } = await supabase
       .from("profiles")
@@ -85,11 +114,16 @@ export default function MembersPage() {
       return;
     }
 
+    if (!organizationId) {
+      setErrorMessage("Bir organizasyon bulunamadı.");
+      return;
+    }
+
     const { error } = await supabase
       .from("organization_members")
       .insert([
         { 
-          organization_id: CURRENT_ORG_ID, 
+          organization_id: organizationId, 
           user_id: selectedUserId, 
           role: newRole 
         }
