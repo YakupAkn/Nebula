@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next dev",
+    "lint": "next lint"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -25,6 +25,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "nodemon": "^3.1.14",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

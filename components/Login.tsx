@@ -10,7 +10,7 @@ export function Login() {
   const [loginMethod, setLoginMethod] = useState<"magic" | "password">("magic");
   const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  
+
   const [needsProfile, setNeedsProfile] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -19,7 +19,7 @@ export function Login() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUserId(session.user.id);
-        
+
         const { data: profile } = await supabase
           .from("profiles")
           .select("id")
@@ -116,21 +116,30 @@ export function Login() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden selection:bg-indigo-500/30">
+    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden selection:bg-indigo-500/30 select-none">
       <StarBackground />
 
-      <div className="w-full max-w-md bg-[#0d0d12]/60 backdrop-blur-2xl border border-zinc-800/80 rounded-2xl p-8 shadow-2xl relative z-10 transition-all duration-300">
+      {/* Kart Konteyner */}
+      <div className="w-full max-w-md bg-zinc-950/70 backdrop-blur-2xl border border-zinc-800/80 rounded-2xl p-8 shadow-2xl shadow-indigo-950/20 relative z-10 transition-all duration-300">
         
         {needsProfile ? (
-          <div>
+          /* Durum 1: Profil Tamamlama Ekranı */
+          <div className="animate-in fade-in duration-300">
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Profilini Tamamla</h1>
-              <p className="text-zinc-400 text-xs mt-1.5">Sistemde ekibinle uyumlu çalışabilmek için adını soyadını girmelisin.</p>
+              <div className="w-10 h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center mx-auto mb-3 text-indigo-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">Profilini Tamamla</h1>
+              <p className="text-zinc-400 text-xs mt-1.5 leading-relaxed">
+                Ekibinle uyumlu çalışabilmek için adını ve soyadını girmelisin.
+              </p>
             </div>
 
             <form onSubmit={handleProfileComplete} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-widest mb-2">
+                <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">
                   Ad Soyad
                 </label>
                 <input
@@ -139,60 +148,72 @@ export function Login() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Yakup Delil"
-                  className="w-full px-4 py-2.5 text-sm bg-zinc-950/50 border border-zinc-800 rounded-lg focus:outline-none focus:border-zinc-500 text-zinc-200 placeholder-zinc-600 transition-colors"
+                  className="w-full px-3.5 py-2.5 text-sm bg-zinc-900/60 border border-zinc-800 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-100 placeholder-zinc-600 transition-all"
                 />
               </div>
 
               {status === "error" && (
-                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg font-medium">
+                <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl font-medium">
                   {errorMessage || "Profil kaydedilemedi."}
-                </p>
+                </div>
               )}
 
               <button
                 type="submit"
-                className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-sm font-medium px-4 py-2.5 rounded-lg transition-all"
+                disabled={status === "loading"}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
               >
-                Kaydet ve Devam Et
+                {status === "loading" ? (
+                  <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  "Kaydet ve Devam Et"
+                )}
               </button>
             </form>
           </div>
         ) : status === "sent" ? (
-          <div className="text-center py-4">
-            <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-indigo-400">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+          /* Durum 2: Magic Link Gönderildi Ekranı */
+          <div className="text-center py-2 animate-in fade-in duration-300">
+            <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-400 shadow-inner">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-zinc-100">Giriş bağlantısı gönderildi</h3>
+            <h3 className="text-lg font-semibold text-zinc-100">Giriş Bağlantısı Gönderildi</h3>
             <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-              <span className="text-zinc-200 font-medium">{email}</span> adresine bir bağlantı ilettik.
+              <span className="text-zinc-200 font-medium">{email}</span> adresine tek kullanımlık bir giriş bağlantısı ilettik.
             </p>
             <button
               onClick={() => setStatus("idle")}
-              className="text-xs text-zinc-500 font-medium mt-6 hover:text-zinc-300 transition-colors underline underline-offset-4"
+              className="text-xs text-zinc-400 font-medium mt-6 hover:text-zinc-200 transition-colors underline underline-offset-4"
             >
-              Farklı bir e-posta dene
+              Farklı bir e-posta adresi dene
             </button>
           </div>
         ) : (
-          <div>
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-zinc-100 to-zinc-400">
+          /* Durum 3: Ana Giriş Formu (Magic Link / Şifre Tab'ları + Google OAuth) */
+          <div className="animate-in fade-in duration-300">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 mb-3 shadow-lg shadow-indigo-500/20">
+                <span className="text-lg font-black text-white tracking-tighter">N</span>
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
                 Nebula
               </h1>
-              <p className="text-zinc-400 text-xs mt-2 font-normal">
+              <p className="text-zinc-400 text-xs mt-1.5 font-normal">
                 Ekip görev akışını yönetmek için giriş yap.
               </p>
             </div>
 
+            {/* Google ile Devam Et */}
             <button
               onClick={handleGoogleLogin}
               disabled={status === "loading"}
               type="button"
-              className="w-full flex items-center justify-center gap-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-200 text-sm font-medium px-4 py-2.5 rounded-lg transition-all"
+              className="w-full flex items-center justify-center gap-3 bg-zinc-900/80 hover:bg-zinc-850 active:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-sm"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
@@ -201,38 +222,47 @@ export function Login() {
               Google ile Devam Et
             </button>
 
-            <div className="relative my-6 flex items-center justify-center">
+            {/* Ayraç */}
+            <div className="relative my-5 flex items-center justify-center">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-zinc-800/80"></div>
               </div>
-              <span className="relative bg-[#0d0d12] px-3 text-[10px] uppercase font-medium tracking-widest text-zinc-500">
+              <span className="relative bg-zinc-950/90 px-3 text-[10px] uppercase font-medium tracking-widest text-zinc-500">
                 veya e-posta
               </span>
             </div>
 
-            {/* Giriş Yöntemi Seçici Sekmeler */}
-            <div className="flex border-b border-zinc-800 mb-4 text-xs font-medium">
+            {/* Segmented Tab Seçici */}
+            <div className="flex p-1 bg-zinc-900/90 border border-zinc-800/80 rounded-xl mb-4">
               <button
                 type="button"
                 onClick={() => setLoginMethod("magic")}
-                className={`flex-1 pb-2 text-center border-b-2 transition-colors ${loginMethod === "magic" ? "border-zinc-200 text-zinc-200" : "border-transparent text-zinc-500"}`}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  loginMethod === "magic"
+                    ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
               >
                 Magic Link
               </button>
               <button
                 type="button"
                 onClick={() => setLoginMethod("password")}
-                className={`flex-1 pb-2 text-center border-b-2 transition-colors ${loginMethod === "password" ? "border-zinc-200 text-zinc-200" : "border-transparent text-zinc-500"}`}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  loginMethod === "password"
+                    ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
               >
-                Şifre (Hızlı Test)
+                Şifre ile Giriş
               </button>
             </div>
 
+            {/* Form Alanları */}
             {loginMethod === "magic" ? (
-              /* Magic Link Formu */
               <form onSubmit={handleMagicLinkLogin} className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-widest mb-2">
+                  <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">
                     E-posta Adresi
                   </label>
                   <input
@@ -241,29 +271,32 @@ export function Login() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="isim@sirket.com"
-                    className="w-full px-4 py-2.5 text-sm bg-zinc-950/40 border border-zinc-800 rounded-lg focus:outline-none focus:border-zinc-500 text-zinc-200 placeholder-zinc-600 transition-colors"
+                    className="w-full px-3.5 py-2.5 text-sm bg-zinc-900/60 border border-zinc-800 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-100 placeholder-zinc-600 transition-all"
                   />
                 </div>
 
                 {status === "error" && (
-                  <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg font-medium">
+                  <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl font-medium">
                     {errorMessage || "Bir hata oluştu."}
-                  </p>
+                  </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={status === "loading"}
-                  className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-sm font-semibold px-4 py-2.5 rounded-lg transition-all"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
                 >
-                  {status === "loading" ? "Gönderiliyor..." : "Giriş Bağlantısı Gönder"}
+                  {status === "loading" ? (
+                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Giriş Bağlantısı Gönder"
+                  )}
                 </button>
               </form>
             ) : (
-              /* Hızlı Test Şifre Formu */
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-widest mb-2">
+                  <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">
                     E-posta
                   </label>
                   <input
@@ -272,12 +305,12 @@ export function Login() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="test@nebula.com"
-                    className="w-full px-4 py-2.5 text-sm bg-zinc-950/40 border border-zinc-800 rounded-lg focus:outline-none focus:border-zinc-500 text-zinc-200 placeholder-zinc-600 transition-colors"
+                    className="w-full px-3.5 py-2.5 text-sm bg-zinc-900/60 border border-zinc-800 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-100 placeholder-zinc-600 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-widest mb-2">
+                  <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">
                     Şifre
                   </label>
                   <input
@@ -286,22 +319,26 @@ export function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-4 py-2.5 text-sm bg-zinc-950/40 border border-zinc-800 rounded-lg focus:outline-none focus:border-zinc-500 text-zinc-200 placeholder-zinc-600 transition-colors"
+                    className="w-full px-3.5 py-2.5 text-sm bg-zinc-900/60 border border-zinc-800 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-zinc-100 placeholder-zinc-600 transition-all"
                   />
                 </div>
 
                 {status === "error" && (
-                  <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg font-medium">
+                  <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl font-medium">
                     {errorMessage || "Giriş başarısız."}
-                  </p>
+                  </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={status === "loading"}
-                  className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-sm font-semibold px-4 py-2.5 rounded-lg transition-all"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
                 >
-                  {status === "loading" ? "Giriş Yapılıyor..." : "Şifre ile Giriş Yap"}
+                  {status === "loading" ? (
+                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Şifre ile Giriş Yap"
+                  )}
                 </button>
               </form>
             )}

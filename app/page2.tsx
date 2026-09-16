@@ -5,14 +5,10 @@ import dynamic from "next/dynamic";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { Column } from "../components/Column";
 import { TaskModal } from "../components/TaskModal";
-import { NewTaskModal } from "../components/NewTaskModal";
-import { ProfileDropdown } from "../components/ProfileDropdown";
 import { OrgSetup } from "../components/OrgSetup";
 import { ProjectSetup } from "../components/ProjectSetup";
 import { OrgMembers } from "../components/OrgMembers";
 import { Login } from "../components/Login";
-import { WelcomeOnboarding } from "../components/WelcomeOnboarding";
-import { AppTour } from "../components/AppTour";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -49,7 +45,6 @@ export default function Home() {
   const [showOrgMembers, setShowOrgMembers] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
-  const [newDescription, setNewDescription] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
   const [newPriority, setNewPriority] = useState("Medium");
   const [newAssignee, setNewAssignee] = useState("");
@@ -58,10 +53,6 @@ export default function Home() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [orgMembers, setOrgMembers] = useState<string[]>([]);
   const [showLanding, setShowLanding] = useState(true);
-  const [currentUserFullName, setCurrentUserFullName] = useState<string | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showTour, setShowTour] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
@@ -133,53 +124,6 @@ export default function Home() {
     if (session) {
       checkOrganization(session.user.id);
     }
-  }, [session]);
-
-  useEffect(() => {
-    if (!session) {
-      setUserId(null);
-      setShowOnboarding(false);
-      setShowTour(false);
-      setCurrentUserFullName(null);
-      return;
-    }
-
-    const checkOnboardingStatus = async () => {
-      setUserId(session.user.id);
-
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      if (!error && profile && !profile.onboarding_completed) {
-        setShowOnboarding(true);
-      }
-    };
-
-    checkOnboardingStatus();
-  }, [session]);
-
-  useEffect(() => {
-    if (!session) {
-      setCurrentUserFullName(null);
-      return;
-    }
-
-    const fetchOwnProfile = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", session.user.id)
-        .single();
-
-      if (!error && data) {
-        setCurrentUserFullName(data.full_name);
-      }
-    };
-
-    fetchOwnProfile();
   }, [session]);
 
   useEffect(() => {
@@ -265,7 +209,7 @@ export default function Home() {
         title: newTitle,
         status: "Yapılacaklar",
         tag: newTag,
-        description: newDescription || "",
+        description: "",
         position: maxPosition + 1000,
         assignee: newAssignee || session?.user?.email || null,
         due_date: newDueDate || null,
@@ -274,16 +218,13 @@ export default function Home() {
       },
     ]);
     setNewTitle("");
-    setNewDescription("");
     setNewDueDate("");
     setNewPriority("Medium");
-    setNewAssignee("");
-    setNewTag("Yazılım");
   };
 
   const handleDeleteTask = async (id: string) => {
     setTasks((prevTasks) => prevTasks.filter((t) => t.id !== id));
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
+    const { error } = await supabase.from("tasks").delete().eq("id", parseInt(id));
     if (error) fetchTasks();
   };
 
@@ -299,7 +240,7 @@ export default function Home() {
     const { error } = await supabase
       .from("tasks")
       .update({ description })
-      .eq("id", id);
+      .eq("id", parseInt(id));
 
     if (error) fetchTasks();
   };
@@ -319,7 +260,7 @@ export default function Home() {
     const { error } = await supabase
       .from("tasks")
       .update(updates)
-      .eq("id", id);
+      .eq("id", parseInt(id));
 
     if (error) fetchTasks();
   };
@@ -387,7 +328,7 @@ export default function Home() {
     await supabase
       .from("tasks")
       .update({ status: targetStatus, position: newPosition })
-      .eq("id", activeId);
+      .eq("id", parseInt(activeId));
   };
 
   if (authLoading) {
@@ -435,161 +376,165 @@ export default function Home() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      {showOnboarding && userId && (
-        <WelcomeOnboarding
-          userId={userId}
-          onComplete={() => {
-            setShowOnboarding(false);
-            setShowTour(true);
-          }}
-        />
-      )}
+      <main className="p-8 md:p-12 bg-[#fafafa] min-h-screen font-sans">
 
-      {showTour && <AppTour onTourEnd={() => setShowTour(false)} />}
-
-      <div className="min-h-screen bg-[#fafafa] font-sans">
-        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200">
-          <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-16 md:h-[72px] flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
-                  Nebula
-                </h1>
-                <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
-                  Canlı
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-8 mb-8 border-b border-slate-200 gap-6">
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              Nebula <span className="text-xs bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">Canlı</span>
+            </h1>
+            <p className="text-slate-500 text-sm mt-1 font-medium">Ekip görev akışını eş zamanlı takip edin.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Form açık değilse bu butonları ve e-postayı göster */}
+            {!isFormOpen && (
+              <>
+                <button
+                  onClick={() => setProjectId(null)}
+                  className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
+                  title="Proje Değiştir"
+                >
+                  Projeler
+                </button>
+                <button
+                  onClick={() => setShowOrgMembers(true)}
+                  className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
+                  title="Üye Ekle"
+                >
+                  Üye Ekle
+                </button>
+                <span className="hidden md:block text-xs text-slate-400 font-medium mr-1">
+                  {session.user.email}
                 </span>
-              </div>
-              <p className="hidden sm:block text-xs text-slate-500 font-medium mt-0.5 truncate">
-                Görevlerinizi tek yerde yönetin.
-              </p>
-            </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-3 py-2 rounded-lg hover:bg-rose-50 transition-all"
+                  title="Çıkış Yap"
+                >
+                  Çıkış Yap
+                </button>
+              </>
+            )}
 
-            <div className="flex items-center gap-1 md:gap-2 shrink-0">
-              <button
-                onClick={() => setProjectId(null)}
-                className="hidden sm:inline-flex text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
-                title="Proje Değiştir"
+            {/* Form açıksa görev ekleme panelini göster */}
+            {isFormOpen && (
+              <form
+                onSubmit={handleAddTask}
+                className="flex flex-wrap items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm transition-all duration-300 animate-in fade-in zoom-in-95"
               >
-                Projeler
-              </button>
-              <button
-                onClick={() => setShowOrgMembers(true)}
-                className="hidden sm:inline-flex text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
-                title="Üye Ekle"
-              >
-                Üyeler
-              </button>
-
-              <ProfileDropdown
-                fullName={currentUserFullName}
-                email={session.user.email ?? null}
-                onLogout={handleLogout}
-              />
-
-              <button
-                type="button"
-                onClick={() => setIsFormOpen(true)}
-                className="bg-slate-900 hover:bg-slate-800 text-white w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-sm transition-all ml-1"
-                title="Yeni Görev"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Mobilde Projeler / Üyeler erişimi */}
-          <div className="sm:hidden flex items-center gap-2 px-4 pb-3">
-            <button
-              onClick={() => setProjectId(null)}
-              className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200"
-            >
-              Projeler
-            </button>
-            <button
-              onClick={() => setShowOrgMembers(true)}
-              className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200"
-            >
-              Üyeler
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-[1400px] mx-auto p-4 md:p-8">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Nebula Senkronize Ediliyor...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {COLUMNS.map((colTitle) => (
-                <Column
-                  key={colTitle}
-                  title={colTitle}
-                  tasks={tasks.filter((t) => t.status === colTitle)}
-                  onDeleteTask={handleDeleteTask}
-                  onTaskClick={setSelectedTask}
+                <input
+                  type="text"
+                  placeholder="Yapılacak bir iş yazın..."
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="px-4 py-2 text-sm bg-slate-50/50 rounded-lg focus:outline-none w-56 text-slate-800 border border-slate-200 focus:border-indigo-500"
+                  autoFocus
                 />
-              ))}
-            </div>
-          )}
+                <select
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
+                >
+                  <option value="Yazılım">Yazılım</option>
+                  <option value="Donanım">Donanım</option>
+                  <option value="Rapor">Rapor</option>
+                </select>
+                <select
+                  value={newAssignee || session?.user.email || ""}
+                  onChange={(e) => setNewAssignee(e.target.value)}
+                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
+                >
+                  {orgMembers.length === 0 ? (
+                    <option value={session?.user.email ?? ""}>{session?.user.email ?? "Ben"}</option>
+                  ) : (
+                    orgMembers.map((email) => (
+                      <option key={email} value={email}>
+                        {email.split("@")[0]}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <div className="w-36">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Öncelik</label>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm bg-white"
+                  >
+                    <option value="Low">Düşük (Low)</option>
+                    <option value="Medium">Orta (Medium)</option>
+                    <option value="High">Yüksek (High)</option>
+                  </select>
+                </div>
+                <input
+                  type="date"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                  className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none text-slate-700 font-medium"
+                />
+                <button
+                  type="submit"
+                  className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
+                >
+                  Görev Oluştur
+                </button>
+              </form>
+            )}
 
-          {process.env.NODE_ENV === "development" && (
+            {/* Formu açıp kapatan artı (+) butonu her zaman kalır */}
             <button
               type="button"
-              onClick={() => {
-                setShowOnboarding(true);
-                setShowTour(false);
-              }}
-              className="fixed bottom-4 right-4 z-50 bg-indigo-600/80 hover:bg-indigo-500 text-white text-[11px] font-mono px-3 py-1.5 rounded-lg backdrop-blur-md border border-indigo-400/30"
+              onClick={() => setIsFormOpen(!isFormOpen)}
+              className={`bg-slate-900 hover:bg-slate-800 text-white w-11 h-11 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${
+                isFormOpen ? "rotate-45 bg-rose-600 hover:bg-rose-500" : "rotate-0"
+              }`}
+              title="Yeni Görev"
             >
-              🧪 Test Onboarding
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
             </button>
-          )}
+          </div>
+        </div>
 
-          {selectedTask && (
-            <TaskModal
-              task={selectedTask}
-              onClose={() => setSelectedTask(null)}
-              onUpdate={handleUpdateDescription}
-              onUpdateMeta={handleUpdateMeta}
-              orgMembers={orgMembers}
-            />
-          )}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Nebula Senkronize Ediliyor...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {COLUMNS.map((colTitle) => (
+              <Column
+                key={colTitle}
+                title={colTitle}
+                tasks={tasks.filter((t) => t.status === colTitle)}
+                onDeleteTask={handleDeleteTask}
+                onTaskClick={setSelectedTask}
+              />
+            ))}
+          </div>
+        )}
 
-          {showOrgMembers && organizationId && (
-            <OrgMembers
-              organizationId={organizationId}
-              onClose={() => setShowOrgMembers(false)}
-            />
-          )}
-
-          <NewTaskModal
-            open={isFormOpen}
-            onClose={() => setIsFormOpen(false)}
-            onSubmit={handleAddTask}
-            title={newTitle}
-            onTitleChange={setNewTitle}
-            description={newDescription}
-            onDescriptionChange={setNewDescription}
-            tag={newTag}
-            onTagChange={setNewTag}
-            assignee={newAssignee}
-            onAssigneeChange={setNewAssignee}
-            priority={newPriority}
-            onPriorityChange={setNewPriority}
-            dueDate={newDueDate}
-            onDueDateChange={setNewDueDate}
+        {selectedTask && (
+          <TaskModal
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onUpdate={handleUpdateDescription}
+            onUpdateMeta={handleUpdateMeta}
             orgMembers={orgMembers}
-            currentUserEmail={session.user.email ?? null}
           />
-        </main>
+        )}
 
-      </div>
+        {showOrgMembers && organizationId && (
+          <OrgMembers
+            organizationId={organizationId}
+            onClose={() => setShowOrgMembers(false)}
+          />
+        )}
+      </main>
     </DndContext>
   );
 }
