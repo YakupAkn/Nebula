@@ -23,7 +23,6 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Dışarı tıklanınca kapatma işlevi
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -40,7 +39,6 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
   const fetchOrganizationMembers = async () => {
     try {
       setLoading(true);
-      // Organizasyona bağlı üyelerin profil bilgilerini çekiyoruz
       const { data, error } = await supabase
         .from("organization_members")
         .select(`
@@ -51,11 +49,15 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
 
       if (error) throw error;
 
-      const formattedMembers: MemberProfile[] = (data || []).map((m) => ({
-        id: m.profiles?.id,
-        full_name: m.profiles?.full_name || "Bilinmeyen Üye",
-        avatar_url: m.profiles?.avatar_url
-      }));
+      const formattedMembers: MemberProfile[] = (data || []).map((m) => {
+        const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+
+        return {
+          id: m.user_id,
+          full_name: profile?.full_name || "Bilinmeyen Üye",
+          avatar_url: profile?.avatar_url || null
+        };
+      });
 
       setMembers(formattedMembers);
 
@@ -83,7 +85,7 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
       <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-widest mb-1.5">
         Görevli
       </label>
-      
+
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -111,7 +113,6 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
 
       {isOpen && (
         <div className="absolute left-0 mt-1.5 w-full bg-[#0d0d12] border border-zinc-800 rounded-xl shadow-2xl z-50 py-1 max-h-60 overflow-y-auto backdrop-blur-xl">
-          {/* Atamayı Kaldır Seçeneği */}
           <button
             type="button"
             onClick={() => handleSelect(null)}
@@ -119,7 +120,7 @@ export default function AssigneeDropdown({ organizationId, currentAssigneeId, on
           >
             Atamayı Kaldır
           </button>
-          
+
           <div className="h-[1px] bg-zinc-800/60 my-1" />
 
           {members.map((member) => (
