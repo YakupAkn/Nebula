@@ -47,6 +47,11 @@ export function ProfileDropdown({ fullName, email, onLogout }: ProfileDropdownPr
     router.push("/pricing");
   };
 
+  const handleAboutClick = () => {
+    setIsOpen(false);
+    router.push("/nebula");
+  };
+
   const handleSignOutClick = async () => {
     setIsOpen(false);
     await supabase.auth.signOut();
@@ -104,6 +109,14 @@ export function ProfileDropdown({ fullName, email, onLogout }: ProfileDropdownPr
             className="w-full text-left px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
           >
             Planını yükselt
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAboutClick}
+            className="w-full text-left px-3.5 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            About Nebula
           </button>
 
           <div className="h-px bg-slate-100 my-1" />

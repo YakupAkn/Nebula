@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { MembersSkeleton } from "@/components/ui/Skeleton";
 
 interface MemberRow {
   id: string;
@@ -62,34 +63,39 @@ export default function MembersPage() {
 
   useEffect(() => {
     async function initialize() {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      if (sessionError || !session) {
-        router.push("/");
-        return;
+        if (sessionError || !session) {
+          router.push("/");
+          return;
+        }
+
+        setSessionUserId(session.user.id);
+
+        const { data, error } = await supabase
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", session.user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error(error);
+        }
+
+        const orgId = data?.organization_id ?? null;
+        setOrganizationId(orgId);
+
+        if (orgId) {
+          await fetchMembers(orgId);
+        }
+      } catch (error) {
+        console.error("Üyeler başlatılırken hata oluştu:", error);
+        setMembers([]);
+      } finally {
+        setLoading(false);
       }
-
-      setSessionUserId(session.user.id);
-
-      const { data, error } = await supabase
-        .from("organization_members")
-        .select("organization_id")
-        .eq("user_id", session.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error(error);
-      }
-
-      const orgId = data?.organization_id ?? null;
-      setOrganizationId(orgId);
-
-      if (orgId) {
-        await fetchMembers(orgId);
-      }
-
-      setLoading(false);
     }
 
     initialize();
@@ -186,17 +192,7 @@ export default function MembersPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex items-center space-x-3 text-slate-500">
-          <svg className="animate-spin h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          <span className="text-sm font-medium">Üyeler yükleniyor...</span>
-        </div>
-      </div>
-    );
+    return <MembersSkeleton />;
   }
 
   return (

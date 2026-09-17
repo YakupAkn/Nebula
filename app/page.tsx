@@ -13,6 +13,7 @@ import { OrgMembers } from "../components/OrgMembers";
 import { Login } from "../components/Login";
 import { WelcomeOnboarding } from "../components/WelcomeOnboarding";
 import { AppTour } from "../components/AppTour";
+import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -391,11 +392,7 @@ export default function Home() {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
-        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!session) {
@@ -407,11 +404,7 @@ export default function Home() {
   }
 
   if (orgCheckLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
-        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!organizationId) {
@@ -431,6 +424,10 @@ export default function Home() {
         onProjectSelected={setProjectId}
       />
     );
+  }
+
+  if (loading) {
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -517,26 +514,17 @@ export default function Home() {
         </header>
 
         <main className="max-w-[1400px] mx-auto p-4 md:p-8">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Nebula Senkronize Ediliyor...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {COLUMNS.map((colTitle) => (
-                <Column
-                  key={colTitle}
-                  title={colTitle}
-                  tasks={tasks.filter((t) => t.status === colTitle)}
-                  onDeleteTask={handleDeleteTask}
-                  onTaskClick={setSelectedTask}
-                />
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {COLUMNS.map((colTitle) => (
+              <Column
+                key={colTitle}
+                title={colTitle}
+                tasks={tasks.filter((t) => t.status === colTitle)}
+                onDeleteTask={handleDeleteTask}
+                onTaskClick={setSelectedTask}
+              />
+            ))}
+          </div>
 
           {process.env.NODE_ENV === "development" && (
             <button

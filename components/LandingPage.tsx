@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -33,6 +34,12 @@ export default function LandingPage({ onStart }: LandingPageProps) {
         </div>
 
         <div className="flex items-center gap-4">
+          <Link
+            href="/nebula"
+            className={`text-xs font-medium transition-colors ${isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}
+          >
+            Why Nebula?
+          </Link>
           <button
             onClick={toggleTheme}
             className={`p-2.5 rounded-xl border transition-all hover:scale-105 ${isDark ? 'border-[#222] hover:bg-zinc-900' : 'border-zinc-200 hover:bg-zinc-100'}`}
@@ -203,7 +210,12 @@ export default function LandingPage({ onStart }: LandingPageProps) {
       </main>
 
       <footer className={`border-t py-14 text-center ${isDark ? 'border-[#222] text-[#666]' : 'border-zinc-200 text-zinc-500'}`}>
-        <p className="text-sm">© 2026 Nebula OS. Tüm hakları saklıdır.</p>
+        <p className="text-sm">
+          © 2026 Nebula OS. Tüm hakları saklıdır.{' '}
+          <Link href="/nebula" className="transition-colors hover:text-indigo-400">
+            About Nebula
+          </Link>
+        </p>
       </footer>
     </div>
   );

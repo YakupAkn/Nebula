@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import StarBackground from "./StarBackground";
 
@@ -204,6 +205,12 @@ export function Login() {
               <p className="text-zinc-400 text-xs mt-1.5 font-normal">
                 Ekip görev akışını yönetmek için giriş yap.
               </p>
+              <Link
+                href="/nebula"
+                className="inline-block mt-3 text-[11px] font-medium text-zinc-500 transition-colors hover:text-indigo-300"
+              >
+                About Nebula
+              </Link>
             </div>
 
             {/* Google ile Devam Et */}
