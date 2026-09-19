@@ -4,6 +4,9 @@ import { db } from '../storage/db';
 import { logger } from '../utils/logger';
 import { getSettings, updateSettings } from '../storage/agent-settings';
 import { executeControlCommand } from '../control/commands';
+import { VercelClient } from '../integrations/vercel/vercel-client';
+
+const vercel = new VercelClient();
 
 export class DashboardServer {
     private app: express.Application;
@@ -66,12 +69,19 @@ export class DashboardServer {
         // ── Status Overview ───────────────────────────────────────────
         this.app.get('/api/status', async (_req, res) => {
             try {
-                const { data: currentProd } = await db.from('deployments')
-                    .select('*')
-                    .eq('environment', 'production')
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                const currentProduction = await vercel.getCurrentProductionDeployment();
+
+                let currentProd = null;
+
+                if (currentProduction) {
+                    const { data } = await db
+                        .from('deployments')
+                        .select('*')
+                        .eq('deployment_id', currentProduction.uid)
+                        .maybeSingle();
+
+                    currentProd = data;
+                }
 
                 let overallHealth = 'UNKNOWN';
                 if (currentProd) {
@@ -165,11 +175,25 @@ export class DashboardServer {
         // ── Health Checks ─────────────────────────────────────────────
         this.app.get('/api/health_checks', async (req, res) => {
             try {
-                const limit = parseInt(req.query.limit as string || '100', 10);
-                const { data } = await db.from('health_checks')
+                const limit = parseInt(
+                    req.query.limit as string || '100',
+                    10
+                );
+
+                const currentProduction =
+                    await vercel.getCurrentProductionDeployment();
+
+                if (!currentProduction) {
+                    return res.json([]);
+                }
+
+                const { data } = await db
+                    .from('health_checks')
                     .select('*')
+                    .eq('deployment_id', currentProduction.uid)
                     .order('checked_at', { ascending: false })
                     .limit(Math.min(limit, 500));
+
                 res.json(data || []);
             } catch (e: any) {
                 res.status(500).json({ error: e.message });
@@ -315,11 +339,28 @@ export class DashboardServer {
         // ── Health Check Chart Data ───────────────────────────────────
         this.app.get('/api/health_checks/chart', async (req, res) => {
             try {
-                const minutes = parseInt(req.query.minutes as string || '60', 10);
-                const since = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+                const minutes = parseInt(
+                    req.query.minutes as string || '60',
+                    10
+                );
 
-                const { data } = await db.from('health_checks')
-                    .select('status_code, latency_ms, is_successful, checked_at')
+                const currentProduction =
+                    await vercel.getCurrentProductionDeployment();
+
+                if (!currentProduction) {
+                    return res.json([]);
+                }
+
+                const since = new Date(
+                    Date.now() - minutes * 60 * 1000
+                ).toISOString();
+
+                const { data } = await db
+                    .from('health_checks')
+                    .select(
+                        'status_code, latency_ms, is_successful, checked_at'
+                    )
+                    .eq('deployment_id', currentProduction.uid)
                     .gte('checked_at', since)
                     .order('checked_at', { ascending: true });
 

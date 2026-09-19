@@ -55,6 +55,38 @@ export class VercelClient {
         }
     }
 
+    async getCurrentProductionDeployment(): Promise<VercelDeploymentResponse | null> {
+        const deployments = await this.getDeployments(20, 'production');
+
+        const productionDomain =
+            process.env.VERCEL_PRODUCTION_DOMAIN || 'nebulateamapp.vercel.app';
+
+        for (const deployment of deployments) {
+            const details = await this.getDeployment(deployment.uid);
+
+            if (!details) continue;
+
+            const readyState = details.readyState || details.state;
+            const deploymentId = details.id || details.uid;
+
+            if (
+                readyState === 'READY' &&
+                deploymentId &&
+                details.alias?.includes(productionDomain)
+            ) {
+                return {
+                    ...deployment,
+                    ...details,
+                    uid: deploymentId,
+                    state: readyState,
+                    created: details.created || deployment.created,
+                };
+            }
+        }
+
+        return null;
+    }
+
     async rollbackProduction(deploymentIdToPromote: string): Promise<boolean> {
         if (process.env.RECOVERY_MODE === 'dry-run') {
             await logger.info('vercel_rollback_dry_run', 'DRY-RUN: Would execute Vercel rollback to ' + deploymentIdToPromote);

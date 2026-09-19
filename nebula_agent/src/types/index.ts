@@ -105,13 +105,17 @@ export interface HealthCheck {
 
 export interface VercelDeploymentResponse {
     uid: string;
+    id?: string;
     url: string;
     state: string;
+    readyState?: string;
     name: string;
+    target?: string;
+    alias?: string[];
+    created: number;
+    createdAt?: string;
     meta?: {
         githubCommitSha?: string;
         githubCommitRef?: string;
     };
-    created: number;
-    target?: string;
 }
