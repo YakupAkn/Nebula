@@ -88,17 +88,36 @@ export class DashboardServer {
                     overallHealth = currentProd.health_status;
                 }
 
-                // Get active incident count
-                const { count: activeIncidents } = await db.from('incidents')
-                    .select('*', { count: 'exact', head: true })
-                    .in('status', ['DETECTED', 'INVESTIGATING', 'RECOVERING', 'MANUAL_INTERVENTION_REQUIRED']);
+                // Get active incidents for CURRENT production only
+                let activeIncidents = 0;
 
-                // Get last health check
-                const { data: lastCheck } = await db.from('health_checks')
-                    .select('*')
-                    .order('checked_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                if (currentProduction) {
+                    const { count } = await db.from('incidents')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('deployment_id', currentProduction.uid)
+                        .in('status', [
+                            'DETECTED',
+                            'INVESTIGATING',
+                            'RECOVERING',
+                            'MANUAL_INTERVENTION_REQUIRED'
+                        ]);
+
+                    activeIncidents = count || 0;
+                }
+
+                // Get latest health check for CURRENT production only
+                let lastCheck = null;
+
+                if (currentProduction) {
+                    const { data } = await db.from('health_checks')
+                        .select('*')
+                        .eq('deployment_id', currentProduction.uid)
+                        .order('checked_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    lastCheck = data;
+                }
 
                 // Get last recovery action
                 const { data: lastRecovery } = await db.from('agent_events')
@@ -106,14 +125,7 @@ export class DashboardServer {
                     .in('event_type', ['ROLLBACK_STARTED', 'ROLLBACK_COMPLETED'])
                     .order('created_at', { ascending: false })
                     .limit(1)
-                    .single();
-
-                // Determine overall status considering incidents
-                if ((activeIncidents || 0) > 0 && overallHealth !== 'CRITICAL') {
-                    if (currentProd?.health_status === 'HEALTHY') {
-                        overallHealth = 'RECOVERING';
-                    }
-                }
+                    .maybeSingle();
 
                 const settings = await getSettings();
 
