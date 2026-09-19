@@ -10,6 +10,12 @@ export class IncidentAnalyzer {
     }
 
     async analyzeIncident(incidentId: string) {
+        const { isEnabled } = await import('../storage/agent-settings');
+        if (!(await isEnabled('ai_enabled'))) {
+            await logger.info('ai_analyzer', `AI is OFF; skipping analysis for incident ${incidentId}`);
+            return;
+        }
+
         await logger.info('ai_analyzer', `Analyzing incident ${incidentId}`);
 
         const { data: incident } = await db.from('incidents').select('*').eq('id', incidentId).single();

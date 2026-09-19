@@ -23,4 +23,14 @@ function getSupabaseClient(): SupabaseClient {
     });
 }
 
-export const db = getSupabaseClient();
+let client: SupabaseClient | null = null;
+
+export const db: SupabaseClient = new Proxy({} as SupabaseClient, {
+    get(_target, prop, _receiver) {
+        if (!client) {
+            client = getSupabaseClient();
+        }
+        const value = Reflect.get(client, prop, client);
+        return typeof value === 'function' ? value.bind(client) : value;
+    },
+});

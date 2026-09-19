@@ -5,6 +5,7 @@
     "main": "dist/index.js",
     "scripts": {
         "agent": "tsx src/index.ts",
+        "ctl": "tsx src/cli/ctl.ts",
         "build": "tsc",
         "typecheck": "tsc --noEmit",
         "test": "vitest run"

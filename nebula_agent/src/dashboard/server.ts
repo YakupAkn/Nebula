@@ -2,6 +2,8 @@ import express from 'express';
 import path from 'path';
 import { db } from '../storage/db';
 import { logger } from '../utils/logger';
+import { getSettings, updateSettings } from '../storage/agent-settings';
+import { executeControlCommand } from '../control/commands';
 
 export class DashboardServer {
     private app: express.Application;
@@ -103,6 +105,8 @@ export class DashboardServer {
                     }
                 }
 
+                const settings = await getSettings();
+
                 res.json({
                     overall_health: overallHealth,
                     current_deployment: currentProd,
@@ -111,6 +115,8 @@ export class DashboardServer {
                     last_recovery: lastRecovery,
                     recovery_mode: process.env.RECOVERY_MODE || 'live',
                     agent_uptime: Math.floor((Date.now() - this.startTime) / 1000),
+                    settings,
+                    agent_running: settings.agent_running,
                 });
             } catch (e: any) {
                 res.status(500).json({ error: e.message });
@@ -213,16 +219,66 @@ export class DashboardServer {
         });
 
         // ── Agent Info ────────────────────────────────────────────────
+        this.app.get('/api/settings', async (_req, res) => {
+            try {
+                const settings = await getSettings(true);
+                res.json(settings);
+            } catch (e: any) {
+                res.status(500).json({ error: e.message });
+            }
+        });
+
+        this.app.patch('/api/settings', async (req, res) => {
+            try {
+                const settings = await updateSettings(req.body || {}, 'dashboard');
+                res.json(settings);
+            } catch (e: any) {
+                res.status(400).json({ error: e.message });
+            }
+        });
+
+        this.app.post('/api/agent/start', async (_req, res) => {
+            try {
+                const settings = await updateSettings({ agent_running: true }, 'dashboard');
+                res.json({ success: true, settings });
+            } catch (e: any) {
+                res.status(500).json({ error: e.message });
+            }
+        });
+
+        this.app.post('/api/agent/stop', async (_req, res) => {
+            try {
+                const settings = await updateSettings({ agent_running: false }, 'dashboard');
+                res.json({ success: true, settings });
+            } catch (e: any) {
+                res.status(500).json({ error: e.message });
+            }
+        });
+
+        this.app.post('/api/console', async (req, res) => {
+            try {
+                const command = String(req.body?.command || '');
+                const result = await executeControlCommand(command, 'dashboard');
+                res.status(result.ok ? 200 : 400).json(result);
+            } catch (e: any) {
+                res.status(500).json({ ok: false, error: e.message });
+            }
+        });
+
+        // ── Agent Info ────────────────────────────────────────────────
         this.app.get('/api/agent', async (_req, res) => {
             try {
+                const settings = await getSettings();
+                const workerStatus = settings.agent_running ? 'RUNNING' : 'STOPPED';
                 const services = [
-                    { name: 'Worker', status: 'RUNNING' },
-                    { name: 'Scheduler', status: 'RUNNING' },
-                    { name: 'Vercel Monitor', status: process.env.VERCEL_TOKEN ? 'RUNNING' : 'OFFLINE' },
-                    { name: 'Health Monitor', status: 'RUNNING' },
-                    { name: 'Error Monitor', status: 'RUNNING' },
+                    { name: 'Worker', status: workerStatus },
+                    { name: 'Scheduler', status: workerStatus },
+                    { name: 'GitHub Research', status: !settings.github_enabled ? 'OFF' : (settings.agent_running ? 'RUNNING' : 'STOPPED') },
+                    { name: 'Vercel Monitor', status: !settings.vercel_enabled ? 'OFF' : (!process.env.VERCEL_TOKEN ? 'OFFLINE' : (settings.agent_running ? 'RUNNING' : 'STOPPED')) },
+                    { name: 'Health Monitor', status: !settings.health_enabled ? 'OFF' : (settings.agent_running ? 'RUNNING' : 'STOPPED') },
+                    { name: 'Error Monitor', status: settings.agent_running ? 'RUNNING' : 'STOPPED' },
                     { name: 'Recovery Engine', status: process.env.RECOVERY_MODE === 'dry-run' ? 'DRY-RUN' : 'ARMED' },
-                    { name: 'AI Analyzer', status: process.env.GROQ_API_KEY ? 'RUNNING' : 'OFFLINE' },
+                    { name: 'AI Analyzer', status: !settings.ai_enabled ? 'OFF' : (process.env.GROQ_API_KEY ? (settings.agent_running ? 'RUNNING' : 'STOPPED') : 'OFFLINE') },
                 ];
 
                 // Count jobs processed today
@@ -243,6 +299,7 @@ export class DashboardServer {
 
                 res.json({
                     services,
+                    settings,
                     jobs_processed_today: processedToday || 0,
                     jobs_failed_today: failedToday || 0,
                     jobs_running: running || 0,

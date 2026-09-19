@@ -48,9 +48,13 @@ export class RiskEngine {
 
                 if (incident) {
                     await logger.warn('incident_detected', `Incident ${incident.id} created for deployment ${deploymentId}`);
-                    // Enqueue an AI analysis job
-                    const { JobQueue } = await import('../queue/job-queue');
-                    await JobQueue.enqueue(null, 'analyze_incident', { incident_id: incident.id });
+                    const { isEnabled } = await import('../storage/agent-settings');
+                    if (await isEnabled('ai_enabled')) {
+                        const { JobQueue } = await import('../queue/job-queue');
+                        await JobQueue.enqueue(null, 'analyze_incident', { incident_id: incident.id });
+                    } else {
+                        await logger.info('ai_disabled', 'AI is OFF; skipping incident analysis enqueue');
+                    }
                 }
             }
 

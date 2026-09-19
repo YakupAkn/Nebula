@@ -36,16 +36,25 @@
     document.getElementById('login-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
 
     // ── API Helper ──
-    async function api(path) {
-        const r = await fetch(API + path, { headers: { Authorization: 'Bearer ' + authToken } });
+    async function api(path, opts) {
+        const r = await fetch(API + path, {
+            method: (opts && opts.method) || 'GET',
+            headers: {
+                Authorization: 'Bearer ' + authToken,
+                'Content-Type': 'application/json'
+            },
+            body: opts && opts.body ? JSON.stringify(opts.body) : undefined
+        });
         if (r.status === 401) { showLogin(); throw new Error('Unauthorized'); }
-        return r.json();
+        const data = await r.json();
+        if (!r.ok && data && data.error) throw new Error(data.error);
+        return data;
     }
 
     // ── Navigation ──
     const navItems = document.querySelectorAll('.nav-item');
     const pages = document.querySelectorAll('.page');
-    const titles = { overview: 'Overview', health: 'Production Health', deployments: 'Deployments', incidents: 'Incidents', agent: 'Agent Status', jobs: 'Job Queue', logs: 'Logs' };
+    const titles = { overview: 'Overview', health: 'Production Health', deployments: 'Deployments', incidents: 'Incidents', agent: 'Agent Status', jobs: 'Job Queue', logs: 'Logs', console: 'Console' };
 
     navItems.forEach(n => n.addEventListener('click', () => {
         const pg = n.dataset.page;
@@ -116,6 +125,7 @@
             document.getElementById('recovery-mode').textContent = status.recovery_mode || '--';
             const uptimeS = status.agent_uptime || 0;
             document.getElementById('uptime').textContent = uptimeS > 3600 ? Math.floor(uptimeS / 3600) + 'h ' + Math.floor((uptimeS % 3600) / 60) + 'm' : uptimeS > 60 ? Math.floor(uptimeS / 60) + 'm ' + (uptimeS % 60) + 's' : uptimeS + 's';
+            syncRunButton(status.agent_running);
 
             // Current prod
             const cp = status.current_deployment;
@@ -137,8 +147,8 @@
             // Services
             const svcEl = document.getElementById('ov-services');
             const agentSvcs = [
-                { service_name: 'Agent Worker', status: 'HEALTHY' },
-                { service_name: 'Scheduler', status: 'HEALTHY' },
+                { service_name: 'Agent Worker', status: status.agent_running ? 'HEALTHY' : 'OFFLINE' },
+                { service_name: 'Scheduler', status: status.agent_running ? 'HEALTHY' : 'OFFLINE' },
                 { service_name: 'Recovery Engine', status: status.recovery_mode === 'dry-run' ? 'DRY-RUN' : 'ARMED' },
             ];
             const allSvcs = [...agentSvcs, ...(services || [])];
@@ -241,13 +251,65 @@
         } catch (e) { console.error('Incidents error:', e); }
     }
 
+    function applyToggles(settings) {
+        document.querySelectorAll('.toggle[data-key]').forEach((btn) => {
+            const on = !!(settings && settings[btn.dataset.key]);
+            btn.classList.toggle('on', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        syncRunButton(settings && settings.agent_running);
+        const warn = document.getElementById('settings-warn');
+        if (warn) warn.style.display = settings && settings.persisted === false ? 'block' : 'none';
+    }
+
+    function syncRunButton(running) {
+        const btn = document.getElementById('agent-run-btn');
+        if (!btn) return;
+        if (running) {
+            btn.textContent = 'STOP';
+            btn.className = 'ctrl-btn ctrl-btn-stop';
+        } else {
+            btn.textContent = 'START';
+            btn.className = 'ctrl-btn ctrl-btn-start';
+        }
+        btn.dataset.running = running ? '1' : '0';
+    }
+
+    document.getElementById('agent-run-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('agent-run-btn');
+        const running = btn.dataset.running === '1';
+        try {
+            await api(running ? '/api/agent/stop' : '/api/agent/start', { method: 'POST', body: {} });
+            await refreshAll();
+        } catch (e) { console.error('Agent start/stop failed', e); }
+    });
+
+    document.querySelectorAll('.toggle[data-key]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const key = btn.dataset.key;
+            const next = !btn.classList.contains('on');
+            try {
+                const settings = await api('/api/settings', { method: 'PATCH', body: { [key]: next } });
+                applyToggles(settings);
+                await refreshAgent();
+            } catch (e) {
+                const warn = document.getElementById('settings-warn');
+                if (warn) {
+                    warn.style.display = 'block';
+                    warn.textContent = e.message || 'Failed to update setting. Apply migrations/003_agent_settings.sql first.';
+                }
+            }
+        });
+    });
+
     async function refreshAgent() {
         try {
             const data = await api('/api/agent');
+            applyToggles(data.settings);
             const svcEl = document.getElementById('ag-services');
             if (data.services) {
                 svcEl.innerHTML = data.services.map(s => {
-                    const dotCls = s.status === 'RUNNING' ? 'running' : s.status === 'ARMED' ? 'armed' : s.status === 'DRY-RUN' ? 'degraded' : 'offline';
+                    const dotCls = s.status === 'RUNNING' ? 'running' : s.status === 'ARMED' ? 'armed' : s.status === 'DRY-RUN' ? 'degraded' : s.status === 'STOPPED' || s.status === 'OFF' ? 'offline' : 'offline';
                     return '<div class="svc-row"><span>' + esc(s.name) + '</span><span class="svc-status"><span class="dot dot-' + dotCls + '"></span><span class="mono">' + s.status + '</span></span></div>';
                 }).join('');
             }
@@ -256,6 +318,7 @@
             const upM = Math.floor((data.uptime_seconds % 3600) / 60);
             statsEl.innerHTML = [
                 ['Uptime', upH + 'h ' + upM + 'm'],
+                ['Agent', data.settings && data.settings.agent_running ? 'RUNNING' : 'STOPPED'],
                 ['Jobs Processed Today', data.jobs_processed_today],
                 ['Jobs Failed Today', data.jobs_failed_today],
                 ['Jobs Running', data.jobs_running],
@@ -313,7 +376,30 @@
         else if (pg === 'agent') { await refreshAgent(); }
         else if (pg === 'jobs') { await refreshJobs(); }
         else if (pg === 'logs') { await refreshLogs(); }
+        else if (pg === 'console') { /* keep existing output */ }
     }
+
+    const consoleOut = document.getElementById('console-out');
+    const consoleIn = document.getElementById('console-in');
+
+    async function runConsoleCommand() {
+        const command = consoleIn.value.trim();
+        if (!command) return;
+        consoleOut.textContent += '\n> ' + command;
+        consoleIn.value = '';
+        try {
+            const result = await api('/api/console', { method: 'POST', body: { command } });
+            consoleOut.textContent += '\n' + (result.message || JSON.stringify(result));
+            applyToggles(result.settings);
+        } catch (e) {
+            consoleOut.textContent += '\n' + (e.message || 'Command failed');
+        }
+        consoleOut.scrollTop = consoleOut.scrollHeight;
+        await refreshAll();
+    }
+
+    document.getElementById('console-run').addEventListener('click', runConsoleCommand);
+    consoleIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') runConsoleCommand(); });
 
     // ── Boot ──
     checkAuth();
