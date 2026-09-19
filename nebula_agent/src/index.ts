@@ -10,6 +10,10 @@ async function bootstrap() {
     }
 
     try {
+        const { DashboardServer } = await import('./dashboard/server');
+        const dashboard = new DashboardServer();
+        dashboard.start();
+
         const runner = new AgentRunner();
         await runner.start();
 

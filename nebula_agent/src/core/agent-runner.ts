@@ -7,6 +7,10 @@ import { AIProvider } from '../providers/ai-provider';
 import { AgentJob } from '../types';
 import { db } from '../storage/db';
 import { RateLimitHitError, SafetyLimitReachedError } from '../limits/rate-limit-manager';
+import { processMonitorVercel } from '../jobs/monitor-vercel';
+import { processHealthCheck } from '../jobs/health-check';
+import { IncidentAnalyzer } from '../ai/incident-analyzer';
+import { ServiceMonitor } from '../monitors/service-monitor';
 
 export class AgentRunner {
     private isRunning: boolean = false;
@@ -14,13 +18,18 @@ export class AgentRunner {
     private researchIntervalMs: number;
     private aiProvider: AIProvider;
     private githubResearcher: GithubResearcher;
+    private incidentAnalyzer: IncidentAnalyzer;
     private lastResearchEnqueuedMs: number = 0;
+    private lastMonitorVercelMs: number = 0;
+    private lastHealthCheckMs: number = 0;
+    private lastServiceCheckMs: number = 0;
 
     constructor() {
         this.pollIntervalMs = parseInt(process.env.AGENT_POLL_INTERVAL_MS || '30000', 10);
         this.researchIntervalMs = parseInt(process.env.AGENT_RESEARCH_INTERVAL_MINUTES || '60', 10) * 60 * 1000;
         this.aiProvider = new GroqProvider();
         this.githubResearcher = new GithubResearcher();
+        this.incidentAnalyzer = new IncidentAnalyzer(this.aiProvider);
     }
 
     async start() {
@@ -49,10 +58,30 @@ export class AgentRunner {
 
     private async tick() {
         const nowMs = Date.now();
-        if (nowMs - this.lastResearchEnqueuedMs > this.researchIntervalMs) {
-            this.lastResearchEnqueuedMs = nowMs;
-            await JobQueue.enqueue(null, 'research_github', {});
-            await logger.info('scheduler', 'Enqueued period research_github job');
+        // GitHub research disabled during Vercel monitoring test.
+        // if (nowMs - this.lastResearchEnqueuedMs > this.researchIntervalMs) {
+        //     this.lastResearchEnqueuedMs = nowMs;
+        //     await JobQueue.enqueue(null, 'research_github', {});
+        //     await logger.info('scheduler', 'Enqueued period research_github job');
+        // }
+
+        const healthInterval = parseInt(process.env.HEALTH_CHECK_INTERVAL_MS || '30000', 10);
+        if (nowMs - this.lastHealthCheckMs > healthInterval) {
+            this.lastHealthCheckMs = nowMs;
+            await JobQueue.enqueue(null, 'health_check', {});
+        }
+
+        const vercelInterval = 15000; // Hardcoded fast monitor for deployments
+        if (nowMs - this.lastMonitorVercelMs > vercelInterval) {
+            this.lastMonitorVercelMs = nowMs;
+            await JobQueue.enqueue(null, 'monitor_vercel', {});
+        }
+
+        // Service checks every 60 seconds
+        const serviceInterval = 60000;
+        if (nowMs - this.lastServiceCheckMs > serviceInterval) {
+            this.lastServiceCheckMs = nowMs;
+            await JobQueue.enqueue(null, 'check_services', {});
         }
 
         // Try to process queue
@@ -65,6 +94,14 @@ export class AgentRunner {
                     await this.processResearch(job);
                 } else if (job.job_type === 'analyze_candidate') {
                     await this.processAnalyze(job);
+                } else if (job.job_type === 'monitor_vercel') {
+                    await processMonitorVercel();
+                } else if (job.job_type === 'health_check') {
+                    await processHealthCheck();
+                } else if (job.job_type === 'analyze_incident') {
+                    await this.incidentAnalyzer.analyzeIncident(job.payload.incident_id);
+                } else if (job.job_type === 'check_services') {
+                    await ServiceMonitor.runAll();
                 } else {
                     throw new Error(`Unknown job type: ${job.job_type}`);
                 }

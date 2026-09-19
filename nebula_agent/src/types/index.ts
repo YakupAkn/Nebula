@@ -57,3 +57,61 @@ export interface CandidateAnalysisResult {
     why_nebula_might_fit: string;
     confidence: number;
 }
+
+// === Monitoring Types ===
+
+export interface Deployment {
+    id?: string;
+    deployment_id: string;
+    url: string;
+    commit_sha: string | null;
+    branch: string | null;
+    environment: string;
+    status: string;
+    health_status: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'UNKNOWN';
+    is_known_good: boolean;
+    error_rate: number;
+    avg_latency: number | null;
+    created_at?: string;
+    updated_at?: string;
+    rolled_back_at?: string | null;
+    rollback_reason?: string | null;
+}
+
+export interface Incident {
+    id?: string;
+    type: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    deployment_id: string | null;
+    status: 'DETECTED' | 'INVESTIGATING' | 'RECOVERING' | 'RECOVERED' | 'MANUAL_INTERVENTION_REQUIRED';
+    detected_at?: string;
+    resolved_at?: string | null;
+    root_cause?: string | null;
+    summary?: string | null;
+    actions_taken?: any;
+    created_at?: string;
+}
+
+export interface HealthCheck {
+    id?: string;
+    deployment_id: string;
+    status_code: number | null;
+    latency_ms: number | null;
+    is_successful: boolean;
+    checked_at?: string;
+    response_body: string | null;
+    error_message: string | null;
+}
+
+export interface VercelDeploymentResponse {
+    uid: string;
+    url: string;
+    state: string;
+    name: string;
+    meta?: {
+        githubCommitSha?: string;
+        githubCommitRef?: string;
+    };
+    created: number;
+    target?: string;
+}

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nebula Control Center</title>
+    <meta name="description" content="Production monitoring and self-healing agent for Nebula">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+
+    <!-- LOGIN OVERLAY -->
+    <div id="login-overlay" class="login-overlay" style="display:none;">
+        <div class="login-box">
+            <div style="margin-bottom:1rem"><span class="logo-orb"
+                    style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)"></span>
+            </div>
+            <h2>Nebula Control Center</h2>
+            <p>Enter the dashboard password to continue.</p>
+            <input id="login-pw" class="login-input" type="password" placeholder="Password" autocomplete="off">
+            <button id="login-btn" class="login-btn" type="button">Authenticate</button>
+            <div id="login-err" class="login-error"></div>
+        </div>
+    </div>
+
+    <!-- SHELL -->
+    <div class="shell" id="app-shell" style="display:none;">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h1><span class="logo-orb"></span> <span>Nebula</span></h1>
+            </div>
+            <div class="sidebar-label">Monitoring</div>
+            <nav class="sidebar-nav">
+                <a class="nav-item active" data-page="overview"><span class="nav-icon">◉</span>
+                    <span>Overview</span></a>
+                <a class="nav-item" data-page="health"><span class="nav-icon">♥</span> <span>Health</span></a>
+                <a class="nav-item" data-page="deployments"><span class="nav-icon">⬡</span> <span>Deployments</span></a>
+                <a class="nav-item" data-page="incidents"><span class="nav-icon">⚠</span> <span>Incidents</span></a>
+                <div class="sidebar-label">System</div>
+                <a class="nav-item" data-page="agent"><span class="nav-icon">⚙</span> <span>Agent</span></a>
+                <a class="nav-item" data-page="jobs"><span class="nav-icon">◫</span> <span>Job Queue</span></a>
+                <a class="nav-item" data-page="logs"><span class="nav-icon">▤</span> <span>Logs</span></a>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <div class="content">
+
+            <!-- TOP BAR -->
+            <div class="topbar">
+                <div class="topbar-left">
+                    <span class="topbar-title" id="page-title">Overview</span>
+                    <span id="overall-badge" class="badge badge-unknown">LOADING</span>
+                </div>
+                <div class="topbar-right">
+                    <span>Recovery: <strong id="recovery-mode">--</strong></span>
+                    <span>Uptime: <span class="mono" id="uptime">0s</span></span>
+                </div>
+            </div>
+
+            <!-- ══════════════════ OVERVIEW PAGE ══════════════════ -->
+            <div class="page active" id="page-overview">
+
+                <!-- Top metrics row -->
+                <div class="grid grid-4" style="margin-bottom:1rem;">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Current Production</span></div>
+                        <div class="metric-big" id="ov-dep-id">--</div>
+                        <div class="metric-label" id="ov-dep-url">Waiting for agent...</div>
+                        <div style="display:flex;justify-content:space-between;margin-top:auto;padding-top:0.5rem;">
+                            <span class="mono" style="color:var(--text-dim)" id="ov-commit">--</span>
+                            <span style="color:var(--text-dim);font-size:0.78rem" id="ov-age">--</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Response Time</span></div>
+                        <div><span class="metric-big" id="ov-latency">--</span><span class="metric-unit">ms</span></div>
+                        <div class="metric-label">Average Latency</div>
+                        <div
+                            style="margin-top:auto;display:flex;justify-content:space-between;padding-top:0.5rem;font-size:0.78rem;">
+                            <span style="color:var(--text-dim)">Error Rate</span>
+                            <span class="mono" id="ov-errrate">0%</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Active Incidents</span></div>
+                        <div class="metric-big" id="ov-incidents">0</div>
+                        <div class="metric-label">Open incidents</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Last Recovery</span></div>
+                        <div class="mono" style="font-size:0.82rem;color:var(--text-secondary)" id="ov-recovery">No
+                            recovery actions</div>
+                    </div>
+                </div>
+
+                <!-- System Health + Activity Feed -->
+                <div class="grid grid-2-1" style="margin-bottom:1rem;">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">System Health</span></div>
+                        <div class="svc-list" id="ov-services">
+                            <div class="empty">Loading services...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Activity Feed</span></div>
+                        <div class="feed" id="ov-feed">
+                            <div class="empty">Waiting for events...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deployments table + Incidents -->
+                <div class="grid grid-2-1">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Recent Deployments</span></div>
+                        <table class="tbl">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Commit</th>
+                                    <th>Status</th>
+                                    <th>Health</th>
+                                    <th>Known Good</th>
+                                    <th>Deployed</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ov-deps">
+                                <tr>
+                                    <td colspan="6" class="empty">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Active Incidents</span></div>
+                        <div id="ov-incidents-list">
+                            <div class="empty"><span class="dot dot-healthy"></span> No active incidents.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════ HEALTH PAGE ══════════════════ -->
+            <div class="page" id="page-health">
+                <div class="grid grid-3" style="margin-bottom:1rem;">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">HTTP Status</span></div>
+                        <div class="metric-big" id="h-status">--</div>
+                        <div class="metric-label" id="h-url">--</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Avg Latency</span></div>
+                        <div><span class="metric-big" id="h-latency">--</span><span class="metric-unit">ms</span></div>
+                        <div class="metric-label">Last 10 checks</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Success Rate</span></div>
+                        <div><span class="metric-big" id="h-success">--</span><span class="metric-unit">%</span></div>
+                        <div class="metric-label">Health check pass rate</div>
+                    </div>
+                </div>
+                <div class="card" style="margin-bottom:1rem;">
+                    <div class="card-header"><span class="card-title">Response Time</span>
+                        <div class="time-pills"><button class="pill active" data-min="5">5m</button><button class="pill"
+                                data-min="30">30m</button><button class="pill" data-min="60">1h</button><button
+                                class="pill" data-min="360">6h</button><button class="pill" data-min="1440">24h</button>
+                        </div>
+                    </div>
+                    <div class="chart-area" id="h-chart"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Recent Health Checks</span></div>
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Latency</th>
+                                <th>Result</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="h-table">
+                            <tr>
+                                <td colspan="5" class="empty">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════ DEPLOYMENTS PAGE ══════════════════ -->
+            <div class="page" id="page-deployments">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Deployment History</span></div>
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Deployment ID</th>
+                                <th>URL</th>
+                                <th>Commit</th>
+                                <th>Branch</th>
+                                <th>Status</th>
+                                <th>Health</th>
+                                <th>Error Rate</th>
+                                <th>Known Good</th>
+                                <th>Rollback</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dep-table">
+                            <tr>
+                                <td colspan="10" class="empty">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════ INCIDENTS PAGE ══════════════════ -->
+            <div class="page" id="page-incidents">
+                <div id="inc-list">
+                    <div class="empty">Loading incidents...</div>
+                </div>
+            </div>
+
+            <!-- ══════════════════ AGENT PAGE ══════════════════ -->
+            <div class="page" id="page-agent">
+                <div class="grid grid-1-1" style="margin-bottom:1rem;">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Agent Services</span></div>
+                        <div class="svc-list" id="ag-services">
+                            <div class="empty">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Agent Stats</span></div>
+                        <div class="svc-list" id="ag-stats">
+                            <div class="empty">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════ JOBS PAGE ══════════════════ -->
+            <div class="page" id="page-jobs">
+                <div class="grid grid-4" style="margin-bottom:1rem;">
+                    <div class="card">
+                        <div class="card-title">Pending</div>
+                        <div class="metric-big" id="jq-pending" style="color:var(--degraded)">0</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Running</div>
+                        <div class="metric-big" id="jq-running" style="color:var(--accent)">0</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Completed</div>
+                        <div class="metric-big" id="jq-completed" style="color:var(--healthy)">0</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Failed</div>
+                        <div class="metric-big" id="jq-failed" style="color:var(--critical)">0</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Recent Jobs</span></div>
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Attempts</th>
+                                <th>Error</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jq-table">
+                            <tr>
+                                <td colspan="6" class="empty">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════════ LOGS PAGE ══════════════════ -->
+            <div class="page" id="page-logs">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Agent Logs</span>
+                        <div class="time-pills"><button class="pill log-filter active" data-level="">All</button><button
+                                class="pill log-filter" data-level="info">Info</button><button class="pill log-filter"
+                                data-level="warn">Warn</button><button class="pill log-filter"
+                                data-level="error">Error</button></div>
+                    </div>
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Level</th>
+                                <th>Event</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table">
+                            <tr>
+                                <td colspan="4" class="empty">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div><!-- /content -->
+    </div><!-- /shell -->
+
+    <script src="/app.js"></script>
+</body>
+
+</html>
