@@ -11,6 +11,7 @@ import { processMonitorVercel } from '../jobs/monitor-vercel';
 import { processHealthCheck } from '../jobs/health-check';
 import { IncidentAnalyzer } from '../ai/incident-analyzer';
 import { ServiceMonitor } from '../monitors/service-monitor';
+import { getSettings } from '../storage/agent-settings';
 
 export class AgentRunner {
     private isRunning: boolean = false;
@@ -23,6 +24,7 @@ export class AgentRunner {
     private lastMonitorVercelMs: number = 0;
     private lastHealthCheckMs: number = 0;
     private lastServiceCheckMs: number = 0;
+    private lastPausedLogMs: number = 0;
 
     constructor() {
         this.pollIntervalMs = parseInt(process.env.AGENT_POLL_INTERVAL_MS || '30000', 10);
@@ -57,22 +59,30 @@ export class AgentRunner {
     }
 
     private async tick() {
+        const settings = await getSettings(true);
+        if (!settings.agent_running) {
+            if (Date.now() - this.lastPausedLogMs > 5 * 60 * 1000) {
+                this.lastPausedLogMs = Date.now();
+                await logger.info('agent_paused', 'Agent is STOPPED. Skipping enqueue and job processing.');
+            }
+            return;
+        }
+
         const nowMs = Date.now();
-        // GitHub research disabled during Vercel monitoring test.
-        // if (nowMs - this.lastResearchEnqueuedMs > this.researchIntervalMs) {
-        //     this.lastResearchEnqueuedMs = nowMs;
-        //     await JobQueue.enqueue(null, 'research_github', {});
-        //     await logger.info('scheduler', 'Enqueued period research_github job');
-        // }
+        if (settings.github_enabled && nowMs - this.lastResearchEnqueuedMs > this.researchIntervalMs) {
+            this.lastResearchEnqueuedMs = nowMs;
+            await JobQueue.enqueue(null, 'research_github', {});
+            await logger.info('scheduler', 'Enqueued period research_github job');
+        }
 
         const healthInterval = parseInt(process.env.HEALTH_CHECK_INTERVAL_MS || '30000', 10);
-        if (nowMs - this.lastHealthCheckMs > healthInterval) {
+        if (settings.health_enabled && nowMs - this.lastHealthCheckMs > healthInterval) {
             this.lastHealthCheckMs = nowMs;
             await JobQueue.enqueue(null, 'health_check', {});
         }
 
         const vercelInterval = 15000; // Hardcoded fast monitor for deployments
-        if (nowMs - this.lastMonitorVercelMs > vercelInterval) {
+        if (settings.vercel_enabled && nowMs - this.lastMonitorVercelMs > vercelInterval) {
             this.lastMonitorVercelMs = nowMs;
             await JobQueue.enqueue(null, 'monitor_vercel', {});
         }
@@ -90,23 +100,55 @@ export class AgentRunner {
             await logger.info('job_claimed', `Claiming job ${job.id} [${job.job_type}]`);
 
             try {
+                const live = await getSettings();
+                if (!live.agent_running) {
+                    await this.skipJob(job, 'Agent STOPPED mid-loop');
+                    break;
+                }
+
                 if (job.job_type === 'research_github') {
-                    await this.processResearch(job);
+                    if (!live.github_enabled) {
+                        await this.skipJob(job, 'GitHub is OFF');
+                    } else {
+                        await this.processResearch(job);
+                        await JobQueue.completeJob(job.id);
+                    }
                 } else if (job.job_type === 'analyze_candidate') {
-                    await this.processAnalyze(job);
+                    if (!live.github_enabled) {
+                        await this.skipJob(job, 'GitHub is OFF');
+                    } else if (!live.ai_enabled) {
+                        await this.skipJob(job, 'AI is OFF');
+                    } else {
+                        await this.processAnalyze(job);
+                        await JobQueue.completeJob(job.id);
+                    }
                 } else if (job.job_type === 'monitor_vercel') {
-                    await processMonitorVercel();
+                    if (!live.vercel_enabled) {
+                        await this.skipJob(job, 'Vercel is OFF');
+                    } else {
+                        await processMonitorVercel();
+                        await JobQueue.completeJob(job.id);
+                    }
                 } else if (job.job_type === 'health_check') {
-                    await processHealthCheck();
+                    if (!live.health_enabled) {
+                        await this.skipJob(job, 'Health is OFF');
+                    } else {
+                        await processHealthCheck();
+                        await JobQueue.completeJob(job.id);
+                    }
                 } else if (job.job_type === 'analyze_incident') {
-                    await this.incidentAnalyzer.analyzeIncident(job.payload.incident_id);
+                    if (!live.ai_enabled) {
+                        await this.skipJob(job, 'AI is OFF');
+                    } else {
+                        await this.incidentAnalyzer.analyzeIncident(job.payload.incident_id);
+                        await JobQueue.completeJob(job.id);
+                    }
                 } else if (job.job_type === 'check_services') {
                     await ServiceMonitor.runAll();
+                    await JobQueue.completeJob(job.id);
                 } else {
                     throw new Error(`Unknown job type: ${job.job_type}`);
                 }
-
-                await JobQueue.completeJob(job.id);
             } catch (err: any) {
                 // Determine retry strategies
                 let delay = 0;
@@ -127,6 +169,11 @@ export class AgentRunner {
             // Immediately check for next immediately available job, but allow breathing room.
             job = await JobQueue.claimNextJob();
         }
+    }
+
+    private async skipJob(job: AgentJob, reason: string) {
+        await logger.info('job_skipped', `Skipping ${job.job_type} (${job.id}): ${reason}`);
+        await JobQueue.completeJob(job.id);
     }
 
     private async processResearch(job: AgentJob) {

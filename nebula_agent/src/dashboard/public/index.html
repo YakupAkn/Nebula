@@ -44,6 +44,7 @@
                 <a class="nav-item" data-page="agent"><span class="nav-icon">⚙</span> <span>Agent</span></a>
                 <a class="nav-item" data-page="jobs"><span class="nav-icon">◫</span> <span>Job Queue</span></a>
                 <a class="nav-item" data-page="logs"><span class="nav-icon">▤</span> <span>Logs</span></a>
+                <a class="nav-item" data-page="console"><span class="nav-icon">›</span> <span>Console</span></a>
             </nav>
         </aside>
 
@@ -59,6 +60,7 @@
                 <div class="topbar-right">
                     <span>Recovery: <strong id="recovery-mode">--</strong></span>
                     <span>Uptime: <span class="mono" id="uptime">0s</span></span>
+                    <button id="agent-run-btn" class="ctrl-btn ctrl-btn-stop" type="button">STOP</button>
                 </div>
             </div>
 
@@ -233,16 +235,70 @@
             <div class="page" id="page-agent">
                 <div class="grid grid-1-1" style="margin-bottom:1rem;">
                     <div class="card">
+                        <div class="card-header"><span class="card-title">Kill Switches</span></div>
+                        <div id="settings-warn" class="settings-warn" style="display:none">agent_settings table is missing. Apply migrations/003_agent_settings.sql in Supabase, then restart the agent.</div>
+                        <div class="switch-list" id="ag-switches">
+                            <div class="switch-row">
+                                <div>
+                                    <div class="switch-name">Agent</div>
+                                    <div class="switch-hint">START / STOP job processing</div>
+                                </div>
+                                <button class="toggle" data-key="agent_running" type="button" aria-pressed="false"><span></span></button>
+                            </div>
+                            <div class="switch-row">
+                                <div>
+                                    <div class="switch-name">GitHub</div>
+                                    <div class="switch-hint">Research and candidate analysis</div>
+                                </div>
+                                <button class="toggle" data-key="github_enabled" type="button" aria-pressed="false"><span></span></button>
+                            </div>
+                            <div class="switch-row">
+                                <div>
+                                    <div class="switch-name">Vercel</div>
+                                    <div class="switch-hint">Deployment monitor</div>
+                                </div>
+                                <button class="toggle" data-key="vercel_enabled" type="button" aria-pressed="false"><span></span></button>
+                            </div>
+                            <div class="switch-row">
+                                <div>
+                                    <div class="switch-name">Health</div>
+                                    <div class="switch-hint">Production health checks</div>
+                                </div>
+                                <button class="toggle" data-key="health_enabled" type="button" aria-pressed="false"><span></span></button>
+                            </div>
+                            <div class="switch-row">
+                                <div>
+                                    <div class="switch-name">AI</div>
+                                    <div class="switch-hint">Incident and lead analysis</div>
+                                </div>
+                                <button class="toggle" data-key="ai_enabled" type="button" aria-pressed="false"><span></span></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
                         <div class="card-header"><span class="card-title">Agent Services</span></div>
                         <div class="svc-list" id="ag-services">
                             <div class="empty">Loading...</div>
                         </div>
                     </div>
-                    <div class="card">
-                        <div class="card-header"><span class="card-title">Agent Stats</span></div>
-                        <div class="svc-list" id="ag-stats">
-                            <div class="empty">Loading...</div>
-                        </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Agent Stats</span></div>
+                    <div class="svc-list" id="ag-stats">
+                        <div class="empty">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════ CONSOLE PAGE ══════════════════ -->
+            <div class="page" id="page-console">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Control Console</span></div>
+                    <div class="console-output" id="console-out">status, start, stop, github on|off, vercel on|off, health on|off, ai on|off, help</div>
+                    <div class="console-row">
+                        <span class="console-prompt">ncc&gt;</span>
+                        <input id="console-in" class="console-input" type="text" autocomplete="off" spellcheck="false" placeholder="github off">
+                        <button id="console-run" class="login-btn" type="button" style="width:auto;padding:0.45rem 0.9rem;">Run</button>
                     </div>
                 </div>
             </div>

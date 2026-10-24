@@ -2,6 +2,11 @@ import express from 'express';
 import path from 'path';
 import { db } from '../storage/db';
 import { logger } from '../utils/logger';
+import { getSettings, updateSettings } from '../storage/agent-settings';
+import { executeControlCommand } from '../control/commands';
+import { VercelClient } from '../integrations/vercel/vercel-client';
+
+const vercel = new VercelClient();
 
 export class DashboardServer {
     private app: express.Application;
@@ -64,29 +69,55 @@ export class DashboardServer {
         // ── Status Overview ───────────────────────────────────────────
         this.app.get('/api/status', async (_req, res) => {
             try {
-                const { data: currentProd } = await db.from('deployments')
-                    .select('*')
-                    .eq('environment', 'production')
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                const currentProduction = await vercel.getCurrentProductionDeployment();
+
+                let currentProd = null;
+
+                if (currentProduction) {
+                    const { data } = await db
+                        .from('deployments')
+                        .select('*')
+                        .eq('deployment_id', currentProduction.uid)
+                        .maybeSingle();
+
+                    currentProd = data;
+                }
 
                 let overallHealth = 'UNKNOWN';
                 if (currentProd) {
                     overallHealth = currentProd.health_status;
                 }
 
-                // Get active incident count
-                const { count: activeIncidents } = await db.from('incidents')
-                    .select('*', { count: 'exact', head: true })
-                    .in('status', ['DETECTED', 'INVESTIGATING', 'RECOVERING', 'MANUAL_INTERVENTION_REQUIRED']);
+                // Get active incidents for CURRENT production only
+                let activeIncidents = 0;
 
-                // Get last health check
-                const { data: lastCheck } = await db.from('health_checks')
-                    .select('*')
-                    .order('checked_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                if (currentProduction) {
+                    const { count } = await db.from('incidents')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('deployment_id', currentProduction.uid)
+                        .in('status', [
+                            'DETECTED',
+                            'INVESTIGATING',
+                            'RECOVERING',
+                            'MANUAL_INTERVENTION_REQUIRED'
+                        ]);
+
+                    activeIncidents = count || 0;
+                }
+
+                // Get latest health check for CURRENT production only
+                let lastCheck = null;
+
+                if (currentProduction) {
+                    const { data } = await db.from('health_checks')
+                        .select('*')
+                        .eq('deployment_id', currentProduction.uid)
+                        .order('checked_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    lastCheck = data;
+                }
 
                 // Get last recovery action
                 const { data: lastRecovery } = await db.from('agent_events')
@@ -94,14 +125,9 @@ export class DashboardServer {
                     .in('event_type', ['ROLLBACK_STARTED', 'ROLLBACK_COMPLETED'])
                     .order('created_at', { ascending: false })
                     .limit(1)
-                    .single();
+                    .maybeSingle();
 
-                // Determine overall status considering incidents
-                if ((activeIncidents || 0) > 0 && overallHealth !== 'CRITICAL') {
-                    if (currentProd?.health_status === 'HEALTHY') {
-                        overallHealth = 'RECOVERING';
-                    }
-                }
+                const settings = await getSettings();
 
                 res.json({
                     overall_health: overallHealth,
@@ -111,6 +137,8 @@ export class DashboardServer {
                     last_recovery: lastRecovery,
                     recovery_mode: process.env.RECOVERY_MODE || 'live',
                     agent_uptime: Math.floor((Date.now() - this.startTime) / 1000),
+                    settings,
+                    agent_running: settings.agent_running,
                 });
             } catch (e: any) {
                 res.status(500).json({ error: e.message });
@@ -159,11 +187,25 @@ export class DashboardServer {
         // ── Health Checks ─────────────────────────────────────────────
         this.app.get('/api/health_checks', async (req, res) => {
             try {
-                const limit = parseInt(req.query.limit as string || '100', 10);
-                const { data } = await db.from('health_checks')
+                const limit = parseInt(
+                    req.query.limit as string || '100',
+                    10
+                );
+
+                const currentProduction =
+                    await vercel.getCurrentProductionDeployment();
+
+                if (!currentProduction) {
+                    return res.json([]);
+                }
+
+                const { data } = await db
+                    .from('health_checks')
                     .select('*')
+                    .eq('deployment_id', currentProduction.uid)
                     .order('checked_at', { ascending: false })
                     .limit(Math.min(limit, 500));
+
                 res.json(data || []);
             } catch (e: any) {
                 res.status(500).json({ error: e.message });
@@ -213,16 +255,66 @@ export class DashboardServer {
         });
 
         // ── Agent Info ────────────────────────────────────────────────
+        this.app.get('/api/settings', async (_req, res) => {
+            try {
+                const settings = await getSettings(true);
+                res.json(settings);
+            } catch (e: any) {
+                res.status(500).json({ error: e.message });
+            }
+        });
+
+        this.app.patch('/api/settings', async (req, res) => {
+            try {
+                const settings = await updateSettings(req.body || {}, 'dashboard');
+                res.json(settings);
+            } catch (e: any) {
+                res.status(400).json({ error: e.message });
+            }
+        });
+
+        this.app.post('/api/agent/start', async (_req, res) => {
+            try {
+                const settings = await updateSettings({ agent_running: true }, 'dashboard');
+                res.json({ success: true, settings });
+            } catch (e: any) {
+                res.status(500).json({ error: e.message });
+            }
+        });
+
+        this.app.post('/api/agent/stop', async (_req, res) => {
+            try {
+                const settings = await updateSettings({ agent_running: false }, 'dashboard');
+                res.json({ success: true, settings });
+            } catch (e: any) {
+                res.status(500).json({ error: e.message });
+            }
+        });
+
+        this.app.post('/api/console', async (req, res) => {
+            try {
+                const command = String(req.body?.command || '');
+                const result = await executeControlCommand(command, 'dashboard');
+                res.status(result.ok ? 200 : 400).json(result);
+            } catch (e: any) {
+                res.status(500).json({ ok: false, error: e.message });
+            }
+        });
+
+        // ── Agent Info ────────────────────────────────────────────────
         this.app.get('/api/agent', async (_req, res) => {
             try {
+                const settings = await getSettings();
+                const workerStatus = settings.agent_running ? 'RUNNING' : 'STOPPED';
                 const services = [
-                    { name: 'Worker', status: 'RUNNING' },
-                    { name: 'Scheduler', status: 'RUNNING' },
-                    { name: 'Vercel Monitor', status: process.env.VERCEL_TOKEN ? 'RUNNING' : 'OFFLINE' },
-                    { name: 'Health Monitor', status: 'RUNNING' },
-                    { name: 'Error Monitor', status: 'RUNNING' },
+                    { name: 'Worker', status: workerStatus },
+                    { name: 'Scheduler', status: workerStatus },
+                    { name: 'GitHub Research', status: !settings.github_enabled ? 'OFF' : (settings.agent_running ? 'RUNNING' : 'STOPPED') },
+                    { name: 'Vercel Monitor', status: !settings.vercel_enabled ? 'OFF' : (!process.env.VERCEL_TOKEN ? 'OFFLINE' : (settings.agent_running ? 'RUNNING' : 'STOPPED')) },
+                    { name: 'Health Monitor', status: !settings.health_enabled ? 'OFF' : (settings.agent_running ? 'RUNNING' : 'STOPPED') },
+                    { name: 'Error Monitor', status: settings.agent_running ? 'RUNNING' : 'STOPPED' },
                     { name: 'Recovery Engine', status: process.env.RECOVERY_MODE === 'dry-run' ? 'DRY-RUN' : 'ARMED' },
-                    { name: 'AI Analyzer', status: process.env.GROQ_API_KEY ? 'RUNNING' : 'OFFLINE' },
+                    { name: 'AI Analyzer', status: !settings.ai_enabled ? 'OFF' : (process.env.GROQ_API_KEY ? (settings.agent_running ? 'RUNNING' : 'STOPPED') : 'OFFLINE') },
                 ];
 
                 // Count jobs processed today
@@ -243,6 +335,7 @@ export class DashboardServer {
 
                 res.json({
                     services,
+                    settings,
                     jobs_processed_today: processedToday || 0,
                     jobs_failed_today: failedToday || 0,
                     jobs_running: running || 0,
@@ -258,11 +351,28 @@ export class DashboardServer {
         // ── Health Check Chart Data ───────────────────────────────────
         this.app.get('/api/health_checks/chart', async (req, res) => {
             try {
-                const minutes = parseInt(req.query.minutes as string || '60', 10);
-                const since = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+                const minutes = parseInt(
+                    req.query.minutes as string || '60',
+                    10
+                );
 
-                const { data } = await db.from('health_checks')
-                    .select('status_code, latency_ms, is_successful, checked_at')
+                const currentProduction =
+                    await vercel.getCurrentProductionDeployment();
+
+                if (!currentProduction) {
+                    return res.json([]);
+                }
+
+                const since = new Date(
+                    Date.now() - minutes * 60 * 1000
+                ).toISOString();
+
+                const { data } = await db
+                    .from('health_checks')
+                    .select(
+                        'status_code, latency_ms, is_successful, checked_at'
+                    )
+                    .eq('deployment_id', currentProduction.uid)
                     .gte('checked_at', since)
                     .order('checked_at', { ascending: true });
 

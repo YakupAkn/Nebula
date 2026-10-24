@@ -4,11 +4,6 @@ dotenv.config();
 import { AgentRunner } from './core/agent-runner';
 
 async function bootstrap() {
-    if (process.env.AGENT_ENABLED !== 'true') {
-        console.warn('Agent is disabled. Set AGENT_ENABLED=true in .env to start processing.');
-        process.exit(0);
-    }
-
     try {
         const { DashboardServer } = await import('./dashboard/server');
         const dashboard = new DashboardServer();
@@ -17,7 +12,7 @@ async function bootstrap() {
         const runner = new AgentRunner();
         await runner.start();
 
-        console.log('Worker is now polling and waiting for jobs.');
+        console.log('Control plane is up. Worker honors agent_settings (START/STOP and feature switches).');
 
         // Graceful termination
         process.on('SIGINT', () => {
