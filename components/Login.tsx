@@ -4,13 +4,13 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import StarBackground from "./StarBackground";
 
-export function Login() {
+export function Login({ initialError }: { initialError?: string } = {}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loginMethod, setLoginMethod] = useState<"magic" | "password">("magic");
-  const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">(initialError ? "error" : "idle");
+  const [errorMessage, setErrorMessage] = useState(initialError ?? "");
 
   const [needsProfile, setNeedsProfile] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
