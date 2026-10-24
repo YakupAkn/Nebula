@@ -1,7 +1,10 @@
 import React from "react";
 
 // ==========================================
-// PRIMITIVE SKELETON COMPONENTS
+// PRIMITIVES
+// Renkler ve animasyon globals.css içindeki .skeleton sınıfından gelir.
+// Buraya koyu/renkli dolgu (bg-slate-900, bg-indigo-* vb.) EKLEME:
+// placeholder gerçek arayüz gibi görünür.
 // ==========================================
 
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -12,8 +15,9 @@ export function Skeleton({ className = "", ...props }: SkeletonProps) {
   return (
     <div
       aria-hidden="true"
-      tabIndex={-1}
-      className={`animate-pulse rounded-md bg-slate-200/80 pointer-events-none select-none ${className}`}
+      className={`skeleton ${
+        className.includes("rounded") ? "" : "rounded-md"
+      } pointer-events-none select-none ${className}`}
       {...props}
     />
   );
@@ -91,118 +95,113 @@ export function SkeletonCard({
   );
 }
 
+// Gerçek TaskCard ile aynı iskelet: sol çubuk, etiket, başlık, alt satır
+function TaskCardSkeleton({ titleWidth = "w-4/5" }: { titleWidth?: string }) {
+  return (
+    <div className="bg-white p-4 pl-5 rounded-xl border border-slate-200/80 shadow-sm relative overflow-hidden">
+      <Skeleton className="absolute left-0 top-0 bottom-0 w-1.5 rounded-none" />
+      <div className="flex items-center gap-1.5 mb-3">
+        <Skeleton className="h-4 w-14 rounded-md" />
+        <Skeleton className="h-4 w-10 rounded" />
+      </div>
+      <Skeleton className={`h-4 ${titleWidth}`} />
+      <Skeleton className="h-3 w-3/5 mt-2" />
+      <div className="flex items-center justify-between mt-4">
+        <Skeleton className="h-3 w-14" />
+        <SkeletonCircle className="h-6 w-6" />
+      </div>
+    </div>
+  );
+}
+
 // ==========================================
-// SHARED SKELETON HEADERS
+// SHARED HEADER (Ayarlar, Profil, Üyeler)
+// Gerçek header ile aynı kapsayıcı: max-w-6xl, h-16
 // ==========================================
 
-// Secondary Header (Ayarlar, Profil, Üyeler sayfaları için)
 export function SecondaryHeaderSkeleton() {
   return (
-    <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between sticky top-0 z-10">
-      {/* Sol: Logo ve Isim */}
-      <div className="flex items-center gap-2.5">
-        <Skeleton className="h-8 w-8 rounded-lg bg-indigo-600/80" />
-        <Skeleton className="h-5 w-20 bg-slate-300" />
-      </div>
-
-      {/* Orta: Sekmeler (Projeler, Üyeler, Profil, Ayarlar) */}
-      <div className="hidden sm:flex items-center gap-1">
-        <Skeleton className="h-8 w-20 rounded-lg" />
-        <Skeleton className="h-8 w-20 rounded-lg" />
-        <Skeleton className="h-8 w-20 rounded-lg" />
-        <Skeleton className="h-8 w-20 rounded-lg bg-indigo-100" />
-      </div>
-
-      {/* Sag: Dashboard Butonu */}
-      <div>
-        <Skeleton className="h-8 w-28 rounded-full border border-slate-200" />
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <Skeleton className="h-6 w-20" />
+          <div className="hidden sm:flex items-center gap-2">
+            <Skeleton className="h-8 w-16 rounded-lg" />
+            <Skeleton className="h-8 w-16 rounded-lg" />
+            <Skeleton className="h-8 w-16 rounded-lg" />
+            <Skeleton className="h-8 w-16 rounded-lg" />
+          </div>
+        </div>
+        <Skeleton className="h-8 w-8 rounded-full" />
       </div>
     </header>
   );
 }
 
 // ==========================================
-// PAGE LEVEL SKELETON COMPONENTS
+// DASHBOARD
+// app/page.tsx ile birebir aynı ölçüler: bg-[#fafafa], max-w-[1400px],
+// header h-16 md:h-[72px], 3 kolon, min-h-[500px]. Böylece içerik
+// yüklenince sayfa kaymaz. Kolonlarda "boş durum" yerine kart iskeleti var.
 // ==========================================
 
-/**
- * DASHBOARD SKELETON
- * Ekran Görüntüsü 1'e tamamen uygun:
- * - Sol üst Nebula başlık, CANLI rozeti, alt açıklama
- * - Sağ üst navigasyon butonları ve yuvarlak ekle butonu
- * - 3 adet Kanban Kolonu (Yapılacaklar, Devam Edenler, Tamamlananlar)
- */
+const DASHBOARD_COLUMNS = [
+  { title: "Yapılacaklar", dot: "bg-indigo-500", cards: ["w-4/5", "w-2/3", "w-3/4"] },
+  { title: "Devam Edenler", dot: "bg-amber-500", cards: ["w-3/4", "w-4/5"] },
+  { title: "Tamamlananlar", dot: "bg-emerald-500", cards: ["w-2/3", "w-3/4"] },
+];
+
 export function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50/60 flex flex-col font-sans" aria-hidden="true">
-      {/* Dashboard Header */}
-      <header className="py-4 px-6 md:px-8 border-b border-slate-200/80 bg-white flex items-center justify-between sticky top-0 z-10">
-        <div>
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-7 w-24 bg-slate-800" />
-            <Skeleton className="h-5 w-14 rounded-full bg-indigo-100" />
-          </div>
-          <Skeleton className="h-3.5 w-48 mt-1.5" />
-        </div>
+    <div className="min-h-screen bg-[#fafafa] font-sans" role="status" aria-busy="true">
+      <span className="sr-only">Yükleniyor</span>
 
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-4 w-14 hidden sm:block" />
-          <Skeleton className="h-4 w-12 hidden sm:block" />
-          <Skeleton className="h-9 w-16 rounded-full" />
-          <Skeleton className="h-10 w-10 rounded-full bg-slate-900" />
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-16 md:h-[72px] flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
+                Nebula
+              </span>
+            </div>
+            <Skeleton className="hidden sm:block h-3 w-44 mt-1.5" />
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Skeleton className="hidden sm:block h-4 w-14" />
+            <Skeleton className="hidden sm:block h-4 w-12" />
+            <Skeleton className="h-9 w-9 md:h-10 md:w-10 rounded-full" />
+            <Skeleton className="h-9 w-9 md:h-10 md:w-10 rounded-full" />
+          </div>
         </div>
       </header>
 
-      {/* Kanban Panosu Grid */}
-      <main className="flex-1 p-6 md:p-8 overflow-x-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl mx-auto h-full">
-          {/* Kolon 1: Yapılacaklar */}
-          <div className="bg-slate-100/70 border border-slate-200/80 rounded-2xl p-4 flex flex-col gap-4 min-h-[550px]">
-            <div className="flex justify-between items-center pb-1">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
-                <Skeleton className="h-5 w-28" />
+      <main className="max-w-[1400px] mx-auto p-4 md:p-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {DASHBOARD_COLUMNS.map((col, i) => (
+            <div
+              key={col.title}
+              className={`flex flex-col bg-slate-100/60 rounded-2xl p-4 min-h-[500px] border border-slate-200/60 w-full ${
+                i > 0 ? "hidden md:flex" : ""
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4 px-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${col.dot}`} />
+                  <h2 className="font-semibold text-slate-700 text-sm tracking-tight">
+                    {col.title}
+                  </h2>
+                </div>
+                <Skeleton className="h-5 w-7 rounded-full" />
               </div>
-              <Skeleton className="h-6 w-6 rounded-full bg-slate-200" />
-            </div>
-            <div className="border-2 border-dashed border-slate-200/80 rounded-xl p-4 flex-1 flex flex-col items-center justify-center space-y-3">
-              <SkeletonCircle size="sm" className="h-8 w-8" />
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-48" />
-            </div>
-          </div>
 
-          {/* Kolon 2: Devam Edenler */}
-          <div className="bg-slate-100/70 border border-slate-200/80 rounded-2xl p-4 flex flex-col gap-4 min-h-[550px]">
-            <div className="flex justify-between items-center pb-1">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                <Skeleton className="h-5 w-32" />
+              <div className="flex flex-col gap-3">
+                {col.cards.map((w, idx) => (
+                  <TaskCardSkeleton key={idx} titleWidth={w} />
+                ))}
               </div>
-              <Skeleton className="h-6 w-6 rounded-full bg-slate-200" />
             </div>
-            <div className="border-2 border-dashed border-slate-200/80 rounded-xl p-4 flex-1 flex flex-col items-center justify-center space-y-3">
-              <SkeletonCircle size="sm" className="h-8 w-8" />
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-48" />
-            </div>
-          </div>
-
-          {/* Kolon 3: Tamamlananlar */}
-          <div className="bg-slate-100/70 border border-slate-200/80 rounded-2xl p-4 flex flex-col gap-4 min-h-[550px]">
-            <div className="flex justify-between items-center pb-1">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                <Skeleton className="h-5 w-32" />
-              </div>
-              <Skeleton className="h-6 w-6 rounded-full bg-slate-200" />
-            </div>
-            <div className="border-2 border-dashed border-slate-200/80 rounded-xl p-4 flex-1 flex flex-col items-center justify-center space-y-3">
-              <SkeletonCircle size="sm" className="h-8 w-8" />
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-48" />
-            </div>
-          </div>
+          ))}
         </div>
       </main>
     </div>
@@ -218,17 +217,18 @@ export function DashboardSkeleton() {
  */
 export function SettingsSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50/60 font-sans" aria-hidden="true">
+    <div className="min-h-screen bg-slate-50 font-sans" role="status" aria-busy="true">
+      <span className="sr-only">Yükleniyor</span>
       <SecondaryHeaderSkeleton />
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {/* Başlık Alanı */}
         <div className="flex items-start justify-between">
           <div>
-            <Skeleton className="h-3 w-16 bg-indigo-200 mb-1.5" />
+            <Skeleton className="h-3 w-16 mb-1.5" />
             <Skeleton className="h-7 w-72" />
           </div>
-          <Skeleton className="h-10 w-40 rounded-xl border border-slate-200 bg-white" />
+          <Skeleton className="h-10 w-40 rounded-xl border border-slate-200" />
         </div>
 
         {/* 2 Kolonlu Grid Yapısı */}
@@ -239,7 +239,7 @@ export function SettingsSkeleton() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-3 w-12" />
-                <Skeleton className="h-5 w-12 rounded-full bg-indigo-100" />
+                <Skeleton className="h-5 w-12 rounded-full" />
               </div>
               <Skeleton className="h-6 w-24" />
               <div className="grid grid-cols-3 gap-3 pt-2">
@@ -253,7 +253,7 @@ export function SettingsSkeleton() {
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3 space-y-2">
                   <Skeleton className="h-2.5 w-12" />
-                  <Skeleton className="h-6 w-12 bg-emerald-100" />
+                  <Skeleton className="h-6 w-12" />
                 </div>
               </div>
             </div>
@@ -262,12 +262,12 @@ export function SettingsSkeleton() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-5 w-14 rounded-full bg-slate-100" />
+                <Skeleton className="h-5 w-14 rounded-full" />
               </div>
               <Skeleton className="h-6 w-32" />
               <div className="bg-slate-50 rounded-xl p-4 flex items-center justify-between">
                 <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-5 w-12 rounded-full bg-emerald-100" />
+                <Skeleton className="h-5 w-12 rounded-full" />
               </div>
             </div>
           </div>
@@ -278,7 +278,7 @@ export function SettingsSkeleton() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-3 w-14" />
-                <Skeleton className="h-5 w-12 rounded-full bg-slate-100" />
+                <Skeleton className="h-5 w-12 rounded-full" />
               </div>
               <Skeleton className="h-6 w-20" />
               <div className="border border-dashed border-slate-200 rounded-xl p-8 flex items-center justify-center">
@@ -290,7 +290,7 @@ export function SettingsSkeleton() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
               <Skeleton className="h-3 w-12" />
               <Skeleton className="h-6 w-24" />
-              <Skeleton className="h-11 w-full rounded-xl border border-red-200 bg-red-50/50" />
+              <Skeleton className="h-11 w-full rounded-xl border border-red-200" />
             </div>
           </div>
         </div>
@@ -309,13 +309,14 @@ export function SettingsSkeleton() {
  */
 export function ProfileSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50/60 font-sans" aria-hidden="true">
+    <div className="min-h-screen bg-slate-50 font-sans" role="status" aria-busy="true">
+      <span className="sr-only">Yükleniyor</span>
       <SecondaryHeaderSkeleton />
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         {/* Başlık Alanı */}
         <div>
-          <Skeleton className="h-3 w-12 bg-indigo-200 mb-1.5" />
+          <Skeleton className="h-3 w-12 mb-1.5" />
           <Skeleton className="h-7 w-28" />
           <Skeleton className="h-4 w-96 mt-1.5" />
         </div>
@@ -324,7 +325,7 @@ export function ProfileSkeleton() {
         <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm space-y-6">
           {/* Avatar ve Kullanıcı Başlığı */}
           <div className="flex items-center gap-4">
-            <SkeletonCircle size="xl" className="h-16 w-16 bg-indigo-600/80" />
+            <SkeletonCircle size="xl" className="h-16 w-16" />
             <div className="space-y-1.5">
               <Skeleton className="h-5 w-32" />
               <Skeleton className="h-4 w-28" />
@@ -335,18 +336,18 @@ export function ProfileSkeleton() {
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
               <Skeleton className="h-3.5 w-20" />
-              <Skeleton className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50" />
+              <Skeleton className="h-11 w-full rounded-xl border border-slate-200" />
             </div>
             <div className="space-y-1.5">
               <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50" />
+              <Skeleton className="h-11 w-full rounded-xl border border-slate-200" />
             </div>
           </div>
 
           {/* Alt Bilgi ve Kaydet Butonu */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
             <Skeleton className="h-3 w-56" />
-            <Skeleton className="h-10 w-32 rounded-xl bg-slate-900" />
+            <Skeleton className="h-10 w-32 rounded-xl" />
           </div>
         </div>
       </main>
@@ -363,13 +364,14 @@ export function ProfileSkeleton() {
  */
 export function MembersSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50/60 font-sans" aria-hidden="true">
+    <div className="min-h-screen bg-slate-50 font-sans" role="status" aria-busy="true">
+      <span className="sr-only">Yükleniyor</span>
       <SecondaryHeaderSkeleton />
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {/* Başlık Alanı */}
         <div>
-          <Skeleton className="h-3 w-12 bg-indigo-200 mb-1.5" />
+          <Skeleton className="h-3 w-12 mb-1.5" />
           <Skeleton className="h-7 w-28" />
           <Skeleton className="h-4 w-96 mt-1.5" />
         </div>
@@ -384,15 +386,15 @@ export function MembersSkeleton() {
             <div className="space-y-3 pt-2">
               <div className="space-y-1.5">
                 <Skeleton className="h-3.5 w-24" />
-                <Skeleton className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50" />
+                <Skeleton className="h-11 w-full rounded-xl border border-slate-200" />
               </div>
 
               <div className="space-y-1.5">
                 <Skeleton className="h-3.5 w-12" />
-                <Skeleton className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50" />
+                <Skeleton className="h-11 w-full rounded-xl border border-slate-200" />
               </div>
 
-              <Skeleton className="h-11 w-full rounded-xl bg-slate-900 pt-2" />
+              <Skeleton className="h-11 w-full rounded-xl pt-2" />
             </div>
           </div>
 
@@ -400,7 +402,7 @@ export function MembersSkeleton() {
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <Skeleton className="h-3 w-12" />
-              <Skeleton className="h-5 w-12 rounded-full bg-slate-100" />
+              <Skeleton className="h-5 w-12 rounded-full" />
             </div>
             <Skeleton className="h-6 w-32" />
 
@@ -414,12 +416,19 @@ export function MembersSkeleton() {
   );
 }
 
+// Pricing sayfası koyu (bg-black), iskelet de koyu tonda
 export function PricingSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50/60 font-sans p-6 md:p-8 space-y-8" aria-hidden="true">
-      <div className="text-center space-y-3 max-w-xl mx-auto">
+    <div
+      data-skeleton-tone="dark"
+      className="min-h-screen bg-black text-neutral-100 font-sans p-6 md:p-8 space-y-8"
+      role="status"
+      aria-busy="true"
+    >
+      <span className="sr-only">Yükleniyor</span>
+      <div className="text-center space-y-3 max-w-xl mx-auto pt-8">
         <Skeleton className="h-8 w-48 mx-auto" />
-        <Skeleton className="h-4 w-80 mx-auto" />
+        <Skeleton className="h-4 w-80 max-w-full mx-auto" />
         <Skeleton className="h-10 w-40 mx-auto rounded-full mt-4" />
       </div>
 
@@ -427,24 +436,24 @@ export function PricingSkeleton() {
         {[1, 2, 3].map((plan) => (
           <div
             key={plan}
-            className={`p-6 rounded-2xl border bg-white shadow-sm space-y-6 flex flex-col justify-between ${
-              plan === 2 ? "border-indigo-300 ring-2 ring-indigo-100" : "border-slate-200"
+            className={`p-6 rounded-2xl border bg-white/5 space-y-6 flex flex-col justify-between ${
+              plan === 2 ? "border-white/25" : "border-white/10"
             }`}
           >
             <div className="space-y-4">
               <Skeleton className="h-5 w-24" />
               <Skeleton className="h-8 w-32" />
               <Skeleton className="h-4 w-full" />
-              <div className="pt-4 space-y-2 border-t border-slate-100">
+              <div className="pt-4 space-y-2 border-t border-white/10">
                 {[1, 2, 3, 4].map((feat) => (
                   <div key={feat} className="flex items-center gap-2">
-                    <SkeletonCircle size="sm" className="h-4 w-4" />
+                    <SkeletonCircle className="h-4 w-4" />
                     <Skeleton className="h-3 w-4/5" />
                   </div>
                 ))}
               </div>
             </div>
-            <Skeleton className={`h-11 w-full rounded-xl ${plan === 2 ? "bg-slate-900" : "bg-slate-200"}`} />
+            <Skeleton className="h-11 w-full rounded-xl" />
           </div>
         ))}
       </div>
