@@ -15,6 +15,16 @@ import { WelcomeOnboarding } from "../components/WelcomeOnboarding";
 import { AppTour } from "../components/AppTour";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import { supabase } from "@/lib/supabase";
+import {
+  useHashRoute,
+  navigate,
+  closeOverlay,
+  readLastProject,
+  writeLastProject,
+  readAuthErrorFromUrl,
+  clearAuthErrorFromUrl,
+  type RouteModal,
+} from "@/lib/hash-route";
 import type { Session } from "@supabase/supabase-js";
 
 // Vercel çökme hatasını önlemek için LandingPage'i SSR olmadan içeri aktarıyoruz
@@ -46,8 +56,14 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(true);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [orgCheckLoading, setOrgCheckLoading] = useState(true);
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [showOrgMembers, setShowOrgMembers] = useState(false);
+  // Adres çubuğundaki hash (#pano/<proje> vb.) uygulamanın tek doğru kaynağı
+  const route = useHashRoute();
+  const [validProjectId, setValidProjectId] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const projectId =
+    route.view === "pano" && route.projectId && route.projectId === validProjectId
+      ? route.projectId
+      : null;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -56,15 +72,29 @@ export default function Home() {
   const [newAssignee, setNewAssignee] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [loading, setLoading] = useState(true);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [orgMembers, setOrgMembers] = useState<string[]>([]);
-  const [showLanding, setShowLanding] = useState(true);
   const [currentUserFullName, setCurrentUserFullName] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const isFormOpen = route.modal === "yeni-gorev";
+  const showOrgMembers = route.modal === "uyeler";
+  const selectedTask = route.taskId
+    ? tasks.find((t) => t.id === route.taskId) ?? null
+    : null;
+
+  const openOverlay = (modal: RouteModal) =>
+    navigate({ view: "pano", projectId, modal }, { overlay: true });
+  const openTask = (task: Task) =>
+    navigate({ view: "pano", projectId, taskId: task.id }, { overlay: true });
+  const closeCurrentOverlay = () => closeOverlay(route);
+
+  const handleProjectSelected = (id: string) => {
+    setValidProjectId(id);
+    writeLastProject(id);
+    navigate({ view: "pano", projectId: id });
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -94,6 +124,12 @@ export default function Home() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // Google/magic link hata dönüşünü okunur mesaja çevir, adresi temizle
+      const message = readAuthErrorFromUrl();
+      if (message) {
+        setAuthError(message);
+        clearAuthErrorFromUrl("#giris");
+      }
       setSession(session);
       setAuthLoading(false);
     });
@@ -101,6 +137,12 @@ export default function Home() {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
+        if (!session) {
+          // Oturum kapanınca eski kullanıcıya ait durumu sıfırla
+          setOrganizationId(null);
+          setValidProjectId(null);
+          setOrgCheckLoading(true);
+        }
       }
     );
 
@@ -228,6 +270,8 @@ export default function Home() {
   useEffect(() => {
     if (!session || !organizationId || !projectId) return;
 
+    setTasks([]);
+    setLoading(true);
     fetchTasks();
 
     const channel = supabase
@@ -246,6 +290,64 @@ export default function Home() {
     };
   }, [session, organizationId, projectId]);
 
+  // Durum -> adres: kullanıcıyı doğru hash'e yönlendir
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!session) {
+      if (route.view !== "ana" && route.view !== "giris") {
+        navigate({ view: "giris" }, { replace: true });
+      }
+      return;
+    }
+
+    if (orgCheckLoading) return;
+
+    if (!organizationId) {
+      if (route.view !== "organizasyon") {
+        navigate({ view: "organizasyon" }, { replace: true });
+      }
+      return;
+    }
+
+    if (route.view === "projeler") return;
+    if (route.view === "pano" && route.projectId) return;
+
+    const last = readLastProject();
+    navigate(
+      last ? { view: "pano", projectId: last } : { view: "projeler" },
+      { replace: true }
+    );
+  }, [authLoading, session, orgCheckLoading, organizationId, route.view, route.projectId]);
+
+  // Adresteki proje gerçekten bu organizasyona ait mi?
+  useEffect(() => {
+    if (!session || !organizationId || route.view !== "pano" || !route.projectId) return;
+    const target = route.projectId;
+    if (validProjectId === target) return;
+
+    let cancelled = false;
+    supabase
+      .from("projects")
+      .select("id, organization_id")
+      .eq("id", target)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (data && data.organization_id === organizationId) {
+          setValidProjectId(target);
+          writeLastProject(target);
+        } else {
+          writeLastProject(null);
+          navigate({ view: "projeler" }, { replace: true });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, organizationId, route.view, route.projectId, validProjectId]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -254,7 +356,7 @@ export default function Home() {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    setIsFormOpen(false);
+    closeCurrentOverlay();
 
     const columnTasks = tasks.filter((t) => t.status === "Yapılacaklar");
     const maxPosition = columnTasks.length > 0
@@ -293,10 +395,6 @@ export default function Home() {
       prevTasks.map((t) => (t.id === id ? { ...t, description } : t))
     );
 
-    if (selectedTask && selectedTask.id === id) {
-      setSelectedTask({ ...selectedTask, description });
-    }
-
     const { error } = await supabase
       .from("tasks")
       .update({ description })
@@ -312,10 +410,6 @@ export default function Home() {
     setTasks((prevTasks) =>
       prevTasks.map((t) => (t.id === id ? { ...t, ...updates } : t))
     );
-
-    if (selectedTask && selectedTask.id === id) {
-      setSelectedTask({ ...selectedTask, ...updates });
-    }
 
     const { error } = await supabase
       .from("tasks")
@@ -396,11 +490,11 @@ export default function Home() {
   }
 
   if (!session) {
-    if (showLanding) {
-      return <LandingPageWithoutSSR onStart={() => setShowLanding(false)} />;
+    if (route.view === "ana") {
+      return <LandingPageWithoutSSR onStart={() => navigate({ view: "giris" })} />;
     }
 
-    return <Login />;
+    return <Login initialError={authError ?? undefined} />;
   }
 
   if (orgCheckLoading) {
@@ -416,17 +510,18 @@ export default function Home() {
     );
   }
 
-  if (!projectId) {
+  if (route.view === "projeler") {
     return (
       <ProjectSetup
         session={session}
         organizationId={organizationId}
-        onProjectSelected={setProjectId}
+        onProjectSelected={handleProjectSelected}
       />
     );
   }
 
-  if (loading) {
+  // Yönlendirme ya da proje doğrulaması sürerken iskelet göster
+  if (!projectId || loading) {
     return <DashboardSkeleton />;
   }
 
@@ -463,14 +558,14 @@ export default function Home() {
 
             <div className="flex items-center gap-1 md:gap-2 shrink-0">
               <button
-                onClick={() => setProjectId(null)}
+                onClick={() => navigate({ view: "projeler" })}
                 className="hidden sm:inline-flex text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
                 title="Proje Değiştir"
               >
                 Projeler
               </button>
               <button
-                onClick={() => setShowOrgMembers(true)}
+                onClick={() => openOverlay("uyeler")}
                 className="hidden sm:inline-flex text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
                 title="Üye Ekle"
               >
@@ -485,7 +580,7 @@ export default function Home() {
 
               <button
                 type="button"
-                onClick={() => setIsFormOpen(true)}
+                onClick={() => openOverlay("yeni-gorev")}
                 className="bg-slate-900 hover:bg-slate-800 text-white w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-sm transition-all ml-1"
                 title="Yeni Görev"
               >
@@ -499,13 +594,13 @@ export default function Home() {
           {/* Mobilde Projeler / Üyeler erişimi */}
           <div className="sm:hidden flex items-center gap-2 px-4 pb-3">
             <button
-              onClick={() => setProjectId(null)}
+              onClick={() => navigate({ view: "projeler" })}
               className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200"
             >
               Projeler
             </button>
             <button
-              onClick={() => setShowOrgMembers(true)}
+              onClick={() => openOverlay("uyeler")}
               className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200"
             >
               Üyeler
@@ -521,7 +616,7 @@ export default function Home() {
                 title={colTitle}
                 tasks={tasks.filter((t) => t.status === colTitle)}
                 onDeleteTask={handleDeleteTask}
-                onTaskClick={setSelectedTask}
+                onTaskClick={openTask}
               />
             ))}
           </div>
@@ -542,7 +637,7 @@ export default function Home() {
           {selectedTask && (
             <TaskModal
               task={selectedTask}
-              onClose={() => setSelectedTask(null)}
+              onClose={closeCurrentOverlay}
               onUpdate={handleUpdateDescription}
               onUpdateMeta={handleUpdateMeta}
               orgMembers={orgMembers}
@@ -552,13 +647,13 @@ export default function Home() {
           {showOrgMembers && organizationId && (
             <OrgMembers
               organizationId={organizationId}
-              onClose={() => setShowOrgMembers(false)}
+              onClose={closeCurrentOverlay}
             />
           )}
 
           <NewTaskModal
             open={isFormOpen}
-            onClose={() => setIsFormOpen(false)}
+            onClose={closeCurrentOverlay}
             onSubmit={handleAddTask}
             title={newTitle}
             onTitleChange={setNewTitle}
