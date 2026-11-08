@@ -74,7 +74,7 @@ export default function TurnstileWidget({ onToken }: Props) {
           sitekey: TURNSTILE_SITE_KEY,
           theme: "dark",
           // Şüpheli bir durum yoksa kutu hiç görünmez.
-          appearance: "interaction-only",
+          appearance: "always",
           callback: (token: string) => {
             setFailed(false);
             onTokenRef.current(token);
