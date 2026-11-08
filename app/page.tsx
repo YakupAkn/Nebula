@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { Column } from "../components/Column";
@@ -62,6 +62,8 @@ export default function Home() {
   const [orgCheckLoading, setOrgCheckLoading] = useState(true);
   // Adres çubuğundaki hash (#pano/<proje> vb.) uygulamanın tek doğru kaynağı
   const route = useHashRoute();
+  // Kabul edilen / reddedilen davet jetonları: bir daha davet ekranı açılmasın
+  const handledInvites = useRef<Set<string>>(new Set());
   const [validProjectId, setValidProjectId] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const projectId =
@@ -79,6 +81,7 @@ export default function Home() {
   const [orgMembers, setOrgMembers] = useState<string[]>([]);
   const [currentUserFullName, setCurrentUserFullName] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [legalOnly, setLegalOnly] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -102,12 +105,19 @@ export default function Home() {
 
   // Adreste davet varsa o, yoksa giriş öncesi saklanan davet (Google / magic link dönüşü hash'i siler)
   const hashInvite =
-    route.view === "pano" && route.projectId && route.inviteToken
+    route.view === "pano" &&
+    route.projectId &&
+    route.inviteToken &&
+    !handledInvites.current.has(route.inviteToken)
       ? { projectId: route.projectId, token: route.inviteToken }
       : null;
-  const pendingInvite = session ? hashInvite ?? readPendingInvite() : null;
+  const storedInvite = readPendingInvite();
+  const pendingInvite = session
+    ? hashInvite ?? (storedInvite && !handledInvites.current.has(storedInvite.token) ? storedInvite : null)
+    : null;
 
   const handleInviteAccepted = (invitedProjectId: string, invitedOrganizationId: string) => {
+    if (pendingInvite) handledInvites.current.add(pendingInvite.token);
     clearPendingInvite();
     setOrganizationId(invitedOrganizationId);
     setValidProjectId(invitedProjectId);
@@ -116,6 +126,7 @@ export default function Home() {
   };
 
   const handleInviteDecline = () => {
+    if (pendingInvite) handledInvites.current.add(pendingInvite.token);
     clearPendingInvite();
     navigate({ view: "projeler" }, { replace: true });
   };
@@ -222,12 +233,19 @@ export default function Home() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("onboarding_completed")
+        .select("onboarding_completed, terms_accepted_at")
         .eq("id", session.user.id)
         .maybeSingle();
 
-      if (!error && profile && !profile.onboarding_completed) {
-        setShowOnboarding(true);
+      if (!error && profile) {
+        if (!profile.onboarding_completed) {
+          setLegalOnly(false);
+          setShowOnboarding(true);
+        } else if (!profile.terms_accepted_at) {
+          // Eski kullanıcı: sadece Kullanım Şartları onayı iste
+          setLegalOnly(true);
+          setShowOnboarding(true);
+        }
       }
     };
 
@@ -326,7 +344,10 @@ export default function Home() {
 
     // Davet linki: giriş yoksa sakla ve giriş sayfasına yönlendir
     const linkInvite =
-      route.view === "pano" && route.projectId && route.inviteToken
+      route.view === "pano" &&
+      route.projectId &&
+      route.inviteToken &&
+      !handledInvites.current.has(route.inviteToken)
         ? { projectId: route.projectId, token: route.inviteToken }
         : null;
     if (linkInvite) writePendingInvite(linkInvite);
@@ -340,7 +361,8 @@ export default function Home() {
 
     // Bekleyen davet, organizasyon / proje kontrollerinden önce gelir:
     // organizasyonu olmayan davetli #organizasyon'a atılmamalı.
-    const pending = linkInvite ?? readPendingInvite();
+    const stored = readPendingInvite();
+    const pending = linkInvite ?? (stored && !handledInvites.current.has(stored.token) ? stored : null);
     if (pending) {
       if (!linkInvite) {
         navigate(
@@ -611,9 +633,10 @@ export default function Home() {
       {showOnboarding && userId && (
         <WelcomeOnboarding
           userId={userId}
+          legalOnly={legalOnly}
           onComplete={() => {
             setShowOnboarding(false);
-            setShowTour(true);
+            if (!legalOnly) setShowTour(true);
           }}
         />
       )}

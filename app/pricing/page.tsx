@@ -373,6 +373,10 @@ export default function PricingPage() {
       {/* Footer */}
       <footer className="relative z-10 py-6 border-t border-neutral-800 bg-black/80 text-center text-xs text-neutral-500 font-medium backdrop-blur-sm">
         Nebula &copy; 2026 — Tüm hakları saklıdır.
+        <span className="mx-2">·</span>
+        <Link href="/kullanim-sartlari" className="hover:text-neutral-300 underline underline-offset-2">Kullanım Şartları</Link>
+        <span className="mx-2">·</span>
+        <Link href="/kvkk" className="hover:text-neutral-300 underline underline-offset-2">KVKK Aydınlatma Metni</Link>
       </footer>
     </div>
   );

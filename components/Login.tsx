@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import StarBackground from "./StarBackground";
+import TurnstileWidget, { TURNSTILE_ENABLED } from "./TurnstileWidget";
 
 export function Login({ initialError }: { initialError?: string } = {}) {
   const [email, setEmail] = useState("");
@@ -11,6 +12,14 @@ export function Login({ initialError }: { initialError?: string } = {}) {
   const [loginMethod, setLoginMethod] = useState<"magic" | "password">("magic");
   const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">(initialError ? "error" : "idle");
   const [errorMessage, setErrorMessage] = useState(initialError ?? "");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0);
+
+  // Turnstile token'ı tek kullanımlıktır; her denemeden sonra widget yenilenir.
+  const resetCaptcha = () => {
+    setCaptchaToken(null);
+    setCaptchaNonce((n) => n + 1);
+  };
 
   const [needsProfile, setNeedsProfile] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -44,7 +53,7 @@ export function Login({ initialError }: { initialError?: string } = {}) {
 
   const handleMagicLinkLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || (TURNSTILE_ENABLED && !captchaToken)) return;
 
     setStatus("loading");
     setErrorMessage("");
@@ -53,8 +62,10 @@ export function Login({ initialError }: { initialError?: string } = {}) {
       email: email.trim(),
       options: {
         emailRedirectTo: window.location.origin,
+        captchaToken: captchaToken ?? undefined,
       },
     });
+    resetCaptcha();
 
     if (error) {
       setErrorMessage(error.message);
@@ -66,7 +77,7 @@ export function Login({ initialError }: { initialError?: string } = {}) {
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+    if (!email.trim() || !password.trim() || (TURNSTILE_ENABLED && !captchaToken)) return;
 
     setStatus("loading");
     setErrorMessage("");
@@ -74,7 +85,9 @@ export function Login({ initialError }: { initialError?: string } = {}) {
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password: password.trim(),
+      options: { captchaToken: captchaToken ?? undefined },
     });
+    resetCaptcha();
 
     if (error) {
       setErrorMessage(error.message);
@@ -282,6 +295,8 @@ export function Login({ initialError }: { initialError?: string } = {}) {
                   />
                 </div>
 
+                <TurnstileWidget key={`magic-${captchaNonce}`} onToken={setCaptchaToken} />
+
                 {status === "error" && (
                   <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl font-medium">
                     {errorMessage || "Bir hata oluştu."}
@@ -290,8 +305,8 @@ export function Login({ initialError }: { initialError?: string } = {}) {
 
                 <button
                   type="submit"
-                  disabled={status === "loading"}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+                  disabled={status === "loading" || (TURNSTILE_ENABLED && !captchaToken)}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {status === "loading" ? (
                     <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -330,6 +345,8 @@ export function Login({ initialError }: { initialError?: string } = {}) {
                   />
                 </div>
 
+                <TurnstileWidget key={`password-${captchaNonce}`} onToken={setCaptchaToken} />
+
                 {status === "error" && (
                   <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl font-medium">
                     {errorMessage || "Giriş başarısız."}
@@ -338,8 +355,8 @@ export function Login({ initialError }: { initialError?: string } = {}) {
 
                 <button
                   type="submit"
-                  disabled={status === "loading"}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+                  disabled={status === "loading" || (TURNSTILE_ENABLED && !captchaToken)}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {status === "loading" ? (
                     <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
