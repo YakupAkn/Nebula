@@ -11,6 +11,7 @@ import { OrgSetup } from "../components/OrgSetup";
 import { ProjectSetup } from "../components/ProjectSetup";
 import { OrgMembers } from "../components/OrgMembers";
 import { Login } from "../components/Login";
+import { InviteAccept } from "../components/InviteAccept";
 import { WelcomeOnboarding } from "../components/WelcomeOnboarding";
 import { AppTour } from "../components/AppTour";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
@@ -23,6 +24,9 @@ import {
   writeLastProject,
   readAuthErrorFromUrl,
   clearAuthErrorFromUrl,
+  readPendingInvite,
+  writePendingInvite,
+  clearPendingInvite,
   type RouteModal,
 } from "@/lib/hash-route";
 import type { Session } from "@supabase/supabase-js";
@@ -94,6 +98,32 @@ export default function Home() {
     setValidProjectId(id);
     writeLastProject(id);
     navigate({ view: "pano", projectId: id });
+  };
+
+  // Adreste davet varsa o, yoksa giriş öncesi saklanan davet (Google / magic link dönüşü hash'i siler)
+  const hashInvite =
+    route.view === "pano" && route.projectId && route.inviteToken
+      ? { projectId: route.projectId, token: route.inviteToken }
+      : null;
+  const pendingInvite = session ? hashInvite ?? readPendingInvite() : null;
+
+  const handleInviteAccepted = (invitedProjectId: string, invitedOrganizationId: string) => {
+    clearPendingInvite();
+    setOrganizationId(invitedOrganizationId);
+    setValidProjectId(invitedProjectId);
+    writeLastProject(invitedProjectId);
+    navigate({ view: "pano", projectId: invitedProjectId }, { replace: true });
+  };
+
+  const handleInviteDecline = () => {
+    clearPendingInvite();
+    navigate({ view: "projeler" }, { replace: true });
+  };
+
+  const handleInviteSwitchAccount = async () => {
+    // Davet saklı kalır; yeni hesapla giriş yapınca ekran yine gelir
+    if (hashInvite) writePendingInvite(hashInvite);
+    await supabase.auth.signOut();
   };
 
   const sensors = useSensors(
@@ -294,9 +324,29 @@ export default function Home() {
   useEffect(() => {
     if (authLoading) return;
 
+    // Davet linki: giriş yoksa sakla ve giriş sayfasına yönlendir
+    const linkInvite =
+      route.view === "pano" && route.projectId && route.inviteToken
+        ? { projectId: route.projectId, token: route.inviteToken }
+        : null;
+    if (linkInvite) writePendingInvite(linkInvite);
+
     if (!session) {
       if (route.view !== "ana" && route.view !== "giris") {
         navigate({ view: "giris" }, { replace: true });
+      }
+      return;
+    }
+
+    // Bekleyen davet, organizasyon / proje kontrollerinden önce gelir:
+    // organizasyonu olmayan davetli #organizasyon'a atılmamalı.
+    const pending = linkInvite ?? readPendingInvite();
+    if (pending) {
+      if (!linkInvite) {
+        navigate(
+          { view: "pano", projectId: pending.projectId, inviteToken: pending.token },
+          { replace: true }
+        );
       }
       return;
     }
@@ -318,11 +368,12 @@ export default function Home() {
       last ? { view: "pano", projectId: last } : { view: "projeler" },
       { replace: true }
     );
-  }, [authLoading, session, orgCheckLoading, organizationId, route.view, route.projectId]);
+  }, [authLoading, session, orgCheckLoading, organizationId, route.view, route.projectId, route.inviteToken]);
 
   // Adresteki proje gerçekten bu organizasyona ait mi?
   useEffect(() => {
     if (!session || !organizationId || route.view !== "pano" || !route.projectId) return;
+    if (route.inviteToken) return; // davet ekranı kendi akışını yönetir
     const target = route.projectId;
     if (validProjectId === target) return;
 
@@ -332,21 +383,38 @@ export default function Home() {
       .select("id, organization_id")
       .eq("id", target)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (cancelled) return;
         if (data && data.organization_id === organizationId) {
           setValidProjectId(target);
           writeLastProject(target);
-        } else {
-          writeLastProject(null);
-          navigate({ view: "projeler" }, { replace: true });
+          return;
         }
+        // Kullanıcı birden fazla organizasyondaysa (ör. davetle katıldı) proje başka
+        // bir organizasyona ait olabilir; üyeyse oraya geç.
+        if (data) {
+          const { data: membership } = await supabase
+            .from("organization_members")
+            .select("organization_id")
+            .eq("user_id", session.user.id)
+            .eq("organization_id", data.organization_id)
+            .maybeSingle();
+          if (cancelled) return;
+          if (membership) {
+            setOrganizationId(data.organization_id);
+            setValidProjectId(target);
+            writeLastProject(target);
+            return;
+          }
+        }
+        writeLastProject(null);
+        navigate({ view: "projeler" }, { replace: true });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [session, organizationId, route.view, route.projectId, validProjectId]);
+  }, [session, organizationId, route.view, route.projectId, route.inviteToken, validProjectId]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -501,6 +569,19 @@ export default function Home() {
     return <DashboardSkeleton />;
   }
 
+  if (pendingInvite) {
+    return (
+      <InviteAccept
+        key={pendingInvite.token}
+        session={session}
+        token={pendingInvite.token}
+        onAccepted={handleInviteAccepted}
+        onDecline={handleInviteDecline}
+        onSwitchAccount={handleInviteSwitchAccount}
+      />
+    );
+  }
+
   if (!organizationId) {
     return (
       <OrgSetup
@@ -647,6 +728,7 @@ export default function Home() {
           {showOrgMembers && organizationId && (
             <OrgMembers
               organizationId={organizationId}
+              projectId={projectId}
               onClose={closeCurrentOverlay}
             />
           )}

@@ -11,6 +11,7 @@ import { useMemo, useSyncExternalStore } from "react";
  *   /#pano/<proje>/yeni-gorev  yeni görev penceresi
  *   /#pano/<proje>/uyeler      üyeler penceresi
  *   /#pano/<proje>/gorev/<id>  görev detayı
+ *   /#pano/<proje>/davet/<jeton>  proje daveti (davet kabul ekranı)
  *
  * Supabase giriş dönüşündeki parçalar (#access_token=... gibi "=" içerenler)
  * rota sayılmaz, olduğu gibi bırakılır.
@@ -24,11 +25,12 @@ export interface Route {
   projectId: string | null;
   taskId: string | null;
   modal: RouteModal | null;
+  inviteToken: string | null;
 }
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const ROUTE_EVENT = "nebula:hashroute";
-const EMPTY: Route = { view: "ana", projectId: null, taskId: null, modal: null };
+const EMPTY: Route = { view: "ana", projectId: null, taskId: null, modal: null, inviteToken: null };
 
 function safeDecode(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
@@ -56,11 +58,13 @@ export function parseHash(hash: string): Route {
       const projectId = a && ID_PATTERN.test(a) ? a : null;
       let modal: RouteModal | null = null;
       let taskId: string | null = null;
+      let inviteToken: string | null = null;
       if (projectId) {
         if (b === "yeni-gorev" || b === "uyeler") modal = b;
         else if (b === "gorev" && c && ID_PATTERN.test(c)) taskId = c;
+        else if (b === "davet" && c && ID_PATTERN.test(c)) inviteToken = c;
       }
-      return { view: "pano", projectId, taskId, modal };
+      return { view: "pano", projectId, taskId, modal, inviteToken };
     }
     default:
       return EMPTY;
@@ -80,7 +84,8 @@ export function buildHash(route: RouteTarget): string {
     case "pano": {
       if (!route.projectId) return "#pano";
       let hash = `#pano/${encodeURIComponent(route.projectId)}`;
-      if (route.modal) hash += `/${route.modal}`;
+      if (route.inviteToken) hash += `/davet/${encodeURIComponent(route.inviteToken)}`;
+      else if (route.modal) hash += `/${route.modal}`;
       else if (route.taskId) hash += `/gorev/${encodeURIComponent(route.taskId)}`;
       return hash;
     }
@@ -165,6 +170,59 @@ export function writeLastProject(projectId: string | null) {
   } catch {
     /* localStorage kapalı olabilir, sorun değil */
   }
+}
+
+// Giriş yapmamış biri davet linkine tıkladığında daveti saklarız. Google / magic link
+// dönüşü adresteki hash'i sildiği için hash'e güvenemeyiz; localStorage yeni sekmede de çalışır.
+const PENDING_INVITE_KEY = "nebula:pending-invite";
+const PENDING_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export interface PendingInvite {
+  projectId: string;
+  token: string;
+}
+
+export function readPendingInvite(): PendingInvite | null {
+  try {
+    const raw = window.localStorage.getItem(PENDING_INVITE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingInvite> & { savedAt?: number };
+    if (
+      typeof parsed.projectId !== "string" ||
+      typeof parsed.token !== "string" ||
+      !ID_PATTERN.test(parsed.projectId) ||
+      !ID_PATTERN.test(parsed.token) ||
+      typeof parsed.savedAt !== "number" ||
+      Date.now() - parsed.savedAt > PENDING_INVITE_TTL_MS
+    ) {
+      window.localStorage.removeItem(PENDING_INVITE_KEY);
+      return null;
+    }
+    return { projectId: parsed.projectId, token: parsed.token };
+  } catch {
+    return null;
+  }
+}
+
+export function writePendingInvite(invite: PendingInvite) {
+  try {
+    window.localStorage.setItem(PENDING_INVITE_KEY, JSON.stringify({ ...invite, savedAt: Date.now() }));
+  } catch {
+    /* localStorage kapalı olabilir; bu durumda davet yalnızca adresteki hash ile çalışır */
+  }
+}
+
+export function clearPendingInvite() {
+  try {
+    window.localStorage.removeItem(PENDING_INVITE_KEY);
+  } catch {
+    /* sorun değil */
+  }
+}
+
+/** Davet linkini üretir: normal pano linkinin sonuna /davet/<jeton> eklenir. */
+export function buildInviteUrl(projectId: string, token: string): string {
+  return `${window.location.origin}${window.location.pathname}${buildHash({ view: "pano", projectId, inviteToken: token })}`;
 }
 
 /** Supabase'in hata dönüşünü (?error=... ya da #error=...) okunur Türkçe mesaja çevirir. */
