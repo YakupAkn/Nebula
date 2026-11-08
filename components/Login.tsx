@@ -14,10 +14,14 @@ export function Login({ initialError }: { initialError?: string } = {}) {
   const [errorMessage, setErrorMessage] = useState(initialError ?? "");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaNonce, setCaptchaNonce] = useState(0);
+  const [captchaFailed, setCaptchaFailed] = useState(false);
+  // Doğrulama sürüyor: widget açık, token henüz gelmedi, hata da yok.
+  const captchaPending = TURNSTILE_ENABLED && !captchaToken && !captchaFailed;
 
   // Turnstile token'ı tek kullanımlıktır; her denemeden sonra widget yenilenir.
   const resetCaptcha = () => {
     setCaptchaToken(null);
+    setCaptchaFailed(false);
     setCaptchaNonce((n) => n + 1);
   };
 
@@ -295,7 +299,7 @@ export function Login({ initialError }: { initialError?: string } = {}) {
                   />
                 </div>
 
-                <TurnstileWidget key={`magic-${captchaNonce}`} onToken={setCaptchaToken} />
+                <TurnstileWidget key={`magic-${captchaNonce}`} onToken={setCaptchaToken} onFailedChange={setCaptchaFailed} />
 
                 {status === "error" && (
                   <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl font-medium">
@@ -310,6 +314,11 @@ export function Login({ initialError }: { initialError?: string } = {}) {
                 >
                   {status === "loading" ? (
                     <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : captchaPending ? (
+                    <>
+                      <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Doğrulanıyor…
+                    </>
                   ) : (
                     "Giriş Bağlantısı Gönder"
                   )}
@@ -345,7 +354,7 @@ export function Login({ initialError }: { initialError?: string } = {}) {
                   />
                 </div>
 
-                <TurnstileWidget key={`password-${captchaNonce}`} onToken={setCaptchaToken} />
+                <TurnstileWidget key={`password-${captchaNonce}`} onToken={setCaptchaToken} onFailedChange={setCaptchaFailed} />
 
                 {status === "error" && (
                   <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl font-medium">
@@ -360,6 +369,11 @@ export function Login({ initialError }: { initialError?: string } = {}) {
                 >
                   {status === "loading" ? (
                     <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : captchaPending ? (
+                    <>
+                      <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Doğrulanıyor…
+                    </>
                   ) : (
                     "Şifre ile Giriş Yap"
                   )}

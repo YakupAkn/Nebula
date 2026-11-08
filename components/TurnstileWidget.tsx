@@ -48,22 +48,31 @@ function loadTurnstileScript(): Promise<void> {
 type Props = {
   /** Doğrulama bitince token, süresi dolunca ya da hata olunca null döner. */
   onToken: (token: string | null) => void;
+  /** Betik yüklenemezse ya da Cloudflare hata dönerse true, tekrar başarılı olursa false. */
+  onFailedChange?: (failed: boolean) => void;
 };
 
-export default function TurnstileWidget({ onToken }: Props) {
+export default function TurnstileWidget({ onToken, onFailedChange }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const onTokenRef = useRef(onToken);
+  const onFailedRef = useRef(onFailedChange);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     onTokenRef.current = onToken;
-  }, [onToken]);
+    onFailedRef.current = onFailedChange;
+  }, [onToken, onFailedChange]);
 
   useEffect(() => {
     if (!TURNSTILE_ENABLED) return;
 
     let cancelled = false;
     let widgetId: string | undefined;
+    const setFailedState = (value: boolean) => {
+      setFailed(value);
+      onFailedRef.current?.(value);
+    };
+    setFailedState(false);
 
     loadTurnstileScript()
       .then(() => {
@@ -74,21 +83,21 @@ export default function TurnstileWidget({ onToken }: Props) {
           sitekey: TURNSTILE_SITE_KEY,
           theme: "dark",
           // Şüpheli bir durum yoksa kutu hiç görünmez.
-          appearance: "always",
+          appearance: "interaction-only",
           callback: (token: string) => {
-            setFailed(false);
+            setFailedState(false);
             onTokenRef.current(token);
           },
           "expired-callback": () => onTokenRef.current(null),
           "error-callback": () => {
-            setFailed(true);
+            setFailedState(true);
             onTokenRef.current(null);
           },
         });
       })
       .catch(() => {
         if (cancelled) return;
-        setFailed(true);
+        setFailedState(true);
         onTokenRef.current(null);
       });
 
