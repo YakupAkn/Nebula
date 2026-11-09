@@ -14,6 +14,7 @@ import { Login } from "../components/Login";
 import { InviteAccept } from "../components/InviteAccept";
 import { WelcomeOnboarding } from "../components/WelcomeOnboarding";
 import { AppTour } from "../components/AppTour";
+import { SecurityNoticeModal } from "../components/SecurityNoticeModal";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import { supabase } from "@/lib/supabase";
 import {
@@ -642,6 +643,8 @@ export default function Home() {
       )}
 
       {showTour && <AppTour onTourEnd={() => setShowTour(false)} />}
+
+      {!showOnboarding && !showTour && userId && <SecurityNoticeModal userId={userId} />}
 
       <div className="min-h-screen bg-[#fafafa] font-sans">
         <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200">
