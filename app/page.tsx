@@ -215,14 +215,16 @@ export default function Home() {
     setOrgCheckLoading(false);
   };
 
-  useEffect(() => {
-    if (session) {
-      checkOrganization(session.user.id);
-    }
-  }, [session]);
+  const sessionUserId = session?.user.id ?? null;
 
   useEffect(() => {
-    if (!session) {
+    if (sessionUserId) {
+      checkOrganization(sessionUserId);
+    }
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    if (!sessionUserId) {
       setUserId(null);
       setShowOnboarding(false);
       setShowTour(false);
@@ -231,12 +233,12 @@ export default function Home() {
     }
 
     const checkOnboardingStatus = async () => {
-      setUserId(session.user.id);
+      setUserId(sessionUserId);
 
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("onboarding_completed, terms_accepted_at, terms_version")
-        .eq("id", session.user.id)
+        .eq("id", sessionUserId)
         .maybeSingle();
 
       if (!error && profile) {
@@ -252,7 +254,7 @@ export default function Home() {
     };
 
     checkOnboardingStatus();
-  }, [session]);
+  }, [sessionUserId]);
 
   useEffect(() => {
     if (!session) {
@@ -674,6 +676,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => openOverlay("uyeler")}
+                data-tour="members"
                 className="hidden sm:inline-flex text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-50 transition-all"
                 title="Üye Ekle"
               >
@@ -689,6 +692,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => openOverlay("yeni-gorev")}
+                data-tour="add-task"
                 className="bg-slate-900 hover:bg-slate-800 text-white w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-sm transition-all ml-1"
                 title="Yeni Görev"
               >
@@ -709,6 +713,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => openOverlay("uyeler")}
+              data-tour="members"
               className="text-xs text-slate-500 hover:text-indigo-600 font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200"
             >
               Üyeler
@@ -717,7 +722,7 @@ export default function Home() {
         </header>
 
         <main className="max-w-[1400px] mx-auto p-4 md:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div data-tour="kanban" className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {COLUMNS.map((colTitle) => (
               <Column
                 key={colTitle}

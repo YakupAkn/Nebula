@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LEGAL } from "@/lib/legal";
@@ -44,6 +44,45 @@ const REFERRAL_OPTIONS = [
   "Diğer",
 ];
 
+/** Taslak her adımda localStorage'e yazılır; sekme/sayfa değişse de kaybolmaz. */
+interface OnboardingDraft {
+  step: number;
+  occupation: string;
+  teamFocus: string[];
+  teamSize: string;
+  referralSource: string;
+  termsAccepted: boolean;
+  marketingConsent: boolean;
+}
+
+const draftKey = (userId: string, legalOnly: boolean) =>
+  `nebula:onboarding:${legalOnly ? "legal" : "full"}:${userId}`;
+
+function readDraft(key: string): Partial<OnboardingDraft> | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(key: string, draft: OnboardingDraft) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(draft));
+  } catch {
+    // Depolama dolu ya da kapalı olabilir; akış state ile devam eder.
+  }
+}
+
+function clearDraft(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {}
+}
+
 const chip = (active: boolean) =>
   `p-3.5 rounded-xl border text-left text-xs font-medium transition-all ${
     active
@@ -58,21 +97,60 @@ const backBtn =
 
 export function WelcomeOnboarding({ userId, onComplete, legalOnly = false }: OnboardingProps) {
   const TOTAL = legalOnly ? 1 : 4;
-  const [step, setStep] = useState(legalOnly ? 4 : 1);
-  const [occupation, setOccupation] = useState("");
-  const [teamFocus, setTeamFocus] = useState<string[]>([]);
-  const [teamSize, setTeamSize] = useState("");
-  const [referralSource, setReferralSource] = useState("");
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
+  const storageKey = draftKey(userId, legalOnly);
+
+  // Bileşen yalnızca oturum açıldıktan sonra istemcide render edilir; taslak ilk render'da okunur
+  const [initial] = useState<Partial<OnboardingDraft>>(() =>
+    typeof window === "undefined" ? {} : readDraft(storageKey) ?? {}
+  );
+  const minStep = legalOnly ? 4 : 1;
+  const [step, setStep] = useState(
+    typeof initial.step === "number" ? Math.min(4, Math.max(minStep, initial.step)) : minStep
+  );
+  const [occupation, setOccupation] = useState(typeof initial.occupation === "string" ? initial.occupation : "");
+  const [teamFocus, setTeamFocus] = useState<string[]>(
+    Array.isArray(initial.teamFocus) ? initial.teamFocus.filter((x) => typeof x === "string") : []
+  );
+  const [teamSize, setTeamSize] = useState(typeof initial.teamSize === "string" ? initial.teamSize : "");
+  const [referralSource, setReferralSource] = useState(
+    typeof initial.referralSource === "string" ? initial.referralSource : ""
+  );
+  const [termsAccepted, setTermsAccepted] = useState(initial.termsAccepted === true);
+  const [marketingConsent, setMarketingConsent] = useState(initial.marketingConsent === true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Her değişiklikte (adım, seçim, onay) localStorage'e yaz
+  useEffect(() => {
+    writeDraft(storageKey, {
+      step,
+      occupation,
+      teamFocus,
+      teamSize,
+      referralSource,
+      termsAccepted,
+      marketingConsent,
+    });
+  }, [storageKey, step, occupation, teamFocus, teamSize, referralSource, termsAccepted, marketingConsent]);
 
   const toggleFocus = (item: string) =>
     setTeamFocus((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
 
   const handleFinish = async () => {
-    if (!termsAccepted) return;
+    // Son durumu state yerine doğrudan localStorage'den al (tek doğruluk kaynağı)
+    const saved = readDraft(storageKey);
+    const data: OnboardingDraft = {
+      step,
+      occupation,
+      teamFocus,
+      teamSize,
+      referralSource,
+      termsAccepted,
+      marketingConsent,
+      ...(saved ?? {}),
+    } as OnboardingDraft;
+
+    if (!data.termsAccepted) return;
     setLoading(true);
     setError("");
 
@@ -80,17 +158,17 @@ export function WelcomeOnboarding({ userId, onComplete, legalOnly = false }: Onb
     const legalFields = {
       terms_accepted_at: now,
       terms_version: LEGAL.termsVersion,
-      marketing_consent: marketingConsent,
-      marketing_consent_at: marketingConsent ? now : null,
+      marketing_consent: data.marketingConsent,
+      marketing_consent_at: data.marketingConsent ? now : null,
     };
 
     const payload = legalOnly
       ? legalFields
       : {
-          occupation,
-          team_focus: teamFocus,
-          team_size: teamSize,
-          referral_source: referralSource,
+          occupation: data.occupation,
+          team_focus: data.teamFocus,
+          team_size: data.teamSize,
+          referral_source: data.referralSource,
           onboarding_completed: true,
           ...legalFields,
         };
@@ -99,9 +177,11 @@ export function WelcomeOnboarding({ userId, onComplete, legalOnly = false }: Onb
 
     setLoading(false);
     if (updateError) {
+      // Hata durumunda taslak localStorage'de kalır, tekrar denenebilir
       setError("Kaydedilemedi, tekrar dene.");
       return;
     }
+    clearDraft(storageKey);
     onComplete();
   };
 
