@@ -15,6 +15,7 @@ import { InviteAccept } from "../components/InviteAccept";
 import { WelcomeOnboarding } from "../components/WelcomeOnboarding";
 import { AppTour } from "../components/AppTour";
 import { SecurityNoticeModal } from "../components/SecurityNoticeModal";
+import { LEGAL } from "@/lib/legal";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import { supabase } from "@/lib/supabase";
 import {
@@ -234,7 +235,7 @@ export default function Home() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("onboarding_completed, terms_accepted_at")
+        .select("onboarding_completed, terms_accepted_at, terms_version")
         .eq("id", session.user.id)
         .maybeSingle();
 
@@ -242,8 +243,8 @@ export default function Home() {
         if (!profile.onboarding_completed) {
           setLegalOnly(false);
           setShowOnboarding(true);
-        } else if (!profile.terms_accepted_at) {
-          // Eski kullanıcı: sadece Kullanım Şartları onayı iste
+        } else if (!profile.terms_accepted_at || profile.terms_version !== LEGAL.termsVersion) {
+          // Eski kullanıcı veya metin güncellendi: Kullanım Şartları'nı yeniden onaylat
           setLegalOnly(true);
           setShowOnboarding(true);
         }
