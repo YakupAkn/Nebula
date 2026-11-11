@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { AppHeader } from "@/components/AppHeader";
 import { SettingsSkeleton } from "@/components/ui/Skeleton";
 
 interface Organization {
@@ -174,43 +174,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <Link href="/" className="flex items-center space-x-2 text-slate-900 font-bold text-lg">
-              <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm">
-                N
-              </span>
-              <span>Nebula</span>
-            </Link>
-            <nav className="hidden md:flex space-x-2">
-              <Link href="/" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">
-                Projeler
-              </Link>
-              <Link href="/members" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">
-                Üyeler
-              </Link>
-              <Link href="/profile" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">
-                Profil
-              </Link>
-              <Link href="/settings" className="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md">
-                Ayarlar
-              </Link>
-            </nav>
-          </div>
-          <div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m7.5-7.5L3 12m7.5 0h10.5" />
-              </svg>
-              Dashboard
-            </Link>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -248,7 +212,7 @@ export default function SettingsPage() {
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Genel</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Genel</p>
                     <h2 className="mt-2 text-xl font-semibold text-slate-900">{activeOrganization?.name ?? "Organizasyon"}</h2>
                   </div>
                   <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
@@ -257,15 +221,15 @@ export default function SettingsPage() {
                 </div>
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Projeler</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Projeler</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{projects.length}</p>
                   </div>
                   <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Üyeler</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Üyeler</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{members.length}</p>
                   </div>
                   <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Durum</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Durum</p>
                     <p className="mt-2 text-base font-semibold text-emerald-600">Aktif</p>
                   </div>
                 </div>
@@ -274,7 +238,7 @@ export default function SettingsPage() {
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Projeler</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Projeler</p>
                     <h3 className="mt-2 text-lg font-semibold text-slate-900">Tüm projeler</h3>
                   </div>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
@@ -294,7 +258,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-semibold text-slate-800">{project.name}</p>
                           <p className="text-xs text-slate-500">{activeOrganization?.name}</p>
                         </div>
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                           Aktif
                         </span>
                       </div>
@@ -308,7 +272,7 @@ export default function SettingsPage() {
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Üyeler</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Üyeler</p>
                     <h3 className="mt-2 text-lg font-semibold text-slate-900">Ekip</h3>
                   </div>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
@@ -341,7 +305,7 @@ export default function SettingsPage() {
                             <p className="text-xs text-slate-500">{member.email}</p>
                           </div>
                         </div>
-                        <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                        <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
                           {member.role}
                         </span>
                       </div>
@@ -352,7 +316,7 @@ export default function SettingsPage() {
 
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Hesap</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Hesap</p>
                   <h3 className="mt-2 text-lg font-semibold text-slate-900">Oturum</h3>
                 </div>
 
