@@ -12,7 +12,7 @@ interface OrgMembersProps {
 
 export function OrgMembers({ organizationId, projectId, onClose }: OrgMembersProps) {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "not_found" | "already" | "forbidden" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "not_found" | "error">("idle");
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(Boolean(projectId));
   const [linkBusy, setLinkBusy] = useState(false);
@@ -91,31 +91,22 @@ export function OrgMembers({ organizationId, projectId, onClose }: OrgMembersPro
 
     setStatus("loading");
 
-    const { data, error } = await supabase.rpc("add_org_member_by_email", {
-      org_id: organizationId,
-      member_email: email.trim(),
-      member_role: "member",
+    const { data: users, error: searchError } = await supabase.rpc("find_user_by_email", {
+      search_email: email.trim(),
     });
 
-    if (error || !data) {
-      setStatus("error");
-      return;
-    }
-
-    const result = (data as { status: string }).status;
-    if (result === "not_found") {
+    if (searchError || !users || users.length === 0) {
       setStatus("not_found");
       return;
     }
-    if (result === "already_member") {
-      setStatus("already");
-      return;
-    }
-    if (result === "forbidden") {
-      setStatus("forbidden");
-      return;
-    }
-    if (result !== "added") {
+
+    const foundUser = users[0];
+
+    const { error: insertError } = await supabase
+      .from("organization_members")
+      .insert([{ organization_id: organizationId, user_id: foundUser.id, role: "member" }]);
+
+    if (insertError) {
       setStatus("error");
       return;
     }
@@ -162,16 +153,10 @@ export function OrgMembers({ organizationId, projectId, onClose }: OrgMembersPro
               Bu e-posta ile kayıtlı bir kullanıcı bulunamadı. Önce kişinin giriş yapması gerekiyor.
             </p>
           )}
-          {status === "already" && (
-            <p className="text-xs text-amber-600 font-medium">Bu kişi zaten organizasyonun üyesi.</p>
-          )}
-          {status === "forbidden" && (
-            <p className="text-xs text-rose-600 font-medium">
-              E-posta ile üye eklemek için organizasyon sahibi olmalısın. Aşağıdaki davet linkini kullanabilirsin.
-            </p>
-          )}
           {status === "error" && (
-            <p className="text-xs text-rose-600 font-medium">Ekleme başarısız oldu, tekrar dene.</p>
+            <p className="text-xs text-rose-600 font-medium">
+              Ekleme başarısız oldu — zaten üye olabilir.
+            </p>
           )}
           {status === "success" && (
             <p className="text-xs text-emerald-600 font-medium">Üye eklendi.</p>
