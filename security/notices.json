@@ -8,10 +8,57 @@
     "etki": "Kimlik dogrulamasi yapmis her kullanici, organizasyon/proje uyeligine bakilmaksizin sistemdeki herhangi bir e-postayi veya kullanici kimligini sorgulayabiliyordu.",
     "cozum": "Her iki fonksiyona da cagiranin hedef kullaniciyla ayni organizasyonda olma sarti eklendi. Fonksiyonlar artik yalnizca ortak organizasyon uyeligi varsa sonuc donduruyor.",
     "zaman_cizelgesi": [
-      { "durum": "tespit_edildi", "etiket": "Tespit Edildi", "zaman": "2026-11-09T12:51:00+03:00" },
-      { "durum": "dogrulandi", "etiket": "Canli Sizma Testiyle Dogrulandi", "zaman": "2026-11-09T12:58:00+03:00" },
-      { "durum": "yamalandi", "etiket": "Yamalandi", "zaman": "2026-11-09T12:59:50+03:00" },
-      { "durum": "deploy_edildi", "etiket": "Veritabanina Deploy Edildi", "zaman": "2026-11-09T13:00:22+03:00" }
+      {
+        "durum": "tespit_edildi",
+        "etiket": "Tespit Edildi",
+        "zaman": "2026-11-09T12:51:00+03:00"
+      },
+      {
+        "durum": "dogrulandi",
+        "etiket": "Canli Sizma Testiyle Dogrulandi",
+        "zaman": "2026-11-09T12:58:00+03:00"
+      },
+      {
+        "durum": "yamalandi",
+        "etiket": "Yamalandi",
+        "zaman": "2026-11-09T12:59:50+03:00"
+      },
+      {
+        "durum": "deploy_edildi",
+        "etiket": "Veritabanina Deploy Edildi",
+        "zaman": "2026-11-09T13:00:22+03:00"
+      }
+    ]
+  },
+  {
+    "id": "sec-2026-11-11-open-rls",
+    "version": "v0.2.1",
+    "severity": "yuksek",
+    "baslik": "Organizasyon ve Proje Erisim Acigi Kapatildi",
+    "ozet": "Organizasyon, uyelik, proje ve proje uyeligi tablolarinda herkese acik erisim politikalari vardi. Oturum acmis herhangi bir hesap baska bir organizasyona owner olarak katilabiliyor, projeleri ve gorevleri okuyabiliyordu.",
+    "etki": "Kimlik dogrulamasi yapmis her kullanici baska organizasyonlarin proje ve gorev verisine erisebilir, izinsiz proje olusturabilirdi.",
+    "cozum": "Tum acik politikalar kaldirildi. Organizasyon, uyelik ve projeler artik yalnizca uyesi olunan organizasyonlar icin okunabiliyor. Organizasyon olusturma ve uye ekleme sunucu tarafinda yetki kontrolu yapan fonksiyonlara tasindi.",
+    "zaman_cizelgesi": [
+      {
+        "durum": "tespit_edildi",
+        "etiket": "Tespit Edildi",
+        "zaman": "2026-11-11T12:52:00+03:00"
+      },
+      {
+        "durum": "dogrulandi",
+        "etiket": "Canli Sizma Testiyle Dogrulandi",
+        "zaman": "2026-11-11T12:54:00+03:00"
+      },
+      {
+        "durum": "yamalandi",
+        "etiket": "Yamalandi",
+        "zaman": "2026-11-11T12:55:40+03:00"
+      },
+      {
+        "durum": "deploy_edildi",
+        "etiket": "Veritabanina Deploy Edildi",
+        "zaman": "2026-11-11T12:55:50+03:00"
+      }
     ]
   }
 ]
