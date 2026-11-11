@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -25,6 +25,15 @@ interface TeamMember {
   role: string;
 }
 
+interface OrganizationMemberRow {
+  id: string;
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -32,6 +41,19 @@ export default function SettingsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
+
+  const loadMembers = useCallback(async (organizationId: string) => {
+    const { data, error } = await supabase.rpc("get_org_members", { org_id: organizationId });
+    if (error) throw error;
+
+    return ((data ?? []) as OrganizationMemberRow[]).map((member) => ({
+      id: member.user_id,
+      full_name: member.full_name || member.email || "Kullanıcı",
+      email: member.email || "E-posta bilgisi yok",
+      avatar_url: member.avatar_url,
+      role: member.role,
+    }));
+  }, []);
 
   useEffect(() => {
     async function loadSettings() {
@@ -84,16 +106,13 @@ export default function SettingsPage() {
           return;
         }
 
-        const [projectResult, memberResult] = await Promise.all([
+        const [projectResult, memberProfiles] = await Promise.all([
           supabase
             .from("projects")
             .select("id, name, organization_id")
             .eq("organization_id", selectedOrganizationId)
             .order("created_at", { ascending: false }),
-          supabase
-            .from("organization_members")
-            .select("user_id, role")
-            .eq("organization_id", selectedOrganizationId),
+          loadMembers(selectedOrganizationId),
         ]);
 
         if (projectResult.error) {
@@ -101,39 +120,6 @@ export default function SettingsPage() {
         }
 
         setProjects((projectResult.data ?? []) as Project[]);
-
-        const memberUserIds = (memberResult.data ?? []).map((member) => member.user_id).filter(Boolean);
-
-        let memberProfiles: TeamMember[] = [];
-        if (memberUserIds.length > 0) {
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("id, full_name, avatar_url")
-            .in("id", memberUserIds);
-
-          if (profileError) {
-            throw profileError;
-          }
-
-          const profileMap = new Map((profileData ?? []).map((profile) => [profile.id, profile]));
-          const roleMap = new Map((memberResult.data ?? []).map((member) => [member.user_id, member.role]));
-
-          memberProfiles = memberUserIds
-            .map((userId) => {
-              const profile = profileMap.get(userId);
-              if (!profile) return null;
-
-              return {
-                id: userId,
-                full_name: profile.full_name || "Kullanıcı",
-                email: profile.full_name || "Kullanıcı",
-                avatar_url: profile.avatar_url,
-                role: roleMap.get(userId) || "member",
-              } as TeamMember;
-            })
-            .filter(Boolean) as TeamMember[];
-        }
-
         setMembers(memberProfiles);
       } catch (error) {
         console.error("Ayarlar yüklenirken hata oluştu:", error);
@@ -143,7 +129,7 @@ export default function SettingsPage() {
     }
 
     loadSettings();
-  }, [router]);
+  }, [loadMembers, router]);
 
   useEffect(() => {
     if (!activeOrganizationId || organizations.length === 0) {
@@ -152,51 +138,17 @@ export default function SettingsPage() {
 
     const loadOrganizationDetails = async () => {
       try {
-        const [projectResult, memberResult] = await Promise.all([
+        const [projectResult, memberProfiles] = await Promise.all([
           supabase
             .from("projects")
             .select("id, name, organization_id")
             .eq("organization_id", activeOrganizationId)
             .order("created_at", { ascending: false }),
-          supabase
-            .from("organization_members")
-            .select("user_id, role")
-            .eq("organization_id", activeOrganizationId),
+          loadMembers(activeOrganizationId),
         ]);
 
         if (projectResult.error) throw projectResult.error;
         setProjects((projectResult.data ?? []) as Project[]);
-
-        const memberUserIds = (memberResult.data ?? []).map((member) => member.user_id).filter(Boolean);
-        let memberProfiles: TeamMember[] = [];
-
-        if (memberUserIds.length > 0) {
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("id, full_name, avatar_url")
-            .in("id", memberUserIds);
-
-          if (profileError) throw profileError;
-
-          const profileMap = new Map((profileData ?? []).map((profile) => [profile.id, profile]));
-          const roleMap = new Map((memberResult.data ?? []).map((member) => [member.user_id, member.role]));
-
-          memberProfiles = memberUserIds
-            .map((userId) => {
-              const profile = profileMap.get(userId);
-              if (!profile) return null;
-
-              return {
-                id: userId,
-                full_name: profile.full_name || "Kullanıcı",
-                email: profile.full_name || "Kullanıcı",
-                avatar_url: profile.avatar_url,
-                role: roleMap.get(userId) || "member",
-              } as TeamMember;
-            })
-            .filter(Boolean) as TeamMember[];
-        }
-
         setMembers(memberProfiles);
       } catch (error) {
         console.error("Organizasyon detayları yüklenirken hata oluştu:", error);
@@ -204,7 +156,7 @@ export default function SettingsPage() {
     };
 
     loadOrganizationDetails();
-  }, [activeOrganizationId, organizations]);
+  }, [activeOrganizationId, loadMembers, organizations]);
 
   const activeOrganization = useMemo(
     () => organizations.find((organization) => organization.id === activeOrganizationId) ?? null,
@@ -373,9 +325,17 @@ export default function SettingsPage() {
                     members.map((member) => (
                       <div key={member.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
-                            {member.full_name.slice(0, 2).toUpperCase()}
-                          </div>
+                          {member.avatar_url ? (
+                            <img
+                              src={member.avatar_url}
+                              alt={`${member.full_name} profil fotoğrafı`}
+                              className="h-9 w-9 rounded-full border border-slate-200 object-cover"
+                            />
+                          ) : (
+                            <div aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                              {member.full_name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
                           <div>
                             <p className="text-sm font-semibold text-slate-800">{member.full_name}</p>
                             <p className="text-xs text-slate-500">{member.email}</p>
