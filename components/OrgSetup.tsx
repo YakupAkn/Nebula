@@ -22,25 +22,13 @@ export function OrgSetup({ session, onOrgCreated }: OrgSetupProps) {
     setStatus("loading");
     setErrorMsg("");
 
-    const { data: org, error: orgError } = await supabase
-      .from("organizations")
-      .insert([{ name: orgName, created_by: session.user.id }])
-      .select()
-      .single();
+    const { data: orgId, error: orgError } = await supabase.rpc("create_organization", {
+      org_name: orgName.trim(),
+    });
 
-    if (orgError || !org) {
+    if (orgError || !orgId) {
       setStatus("error");
       setErrorMsg("Organizasyon oluşturulamadı, tekrar dene.");
-      return;
-    }
-
-    const { error: memberError } = await supabase
-      .from("organization_members")
-      .insert([{ organization_id: org.id, user_id: session.user.id, role: "owner" }]);
-
-    if (memberError) {
-      setStatus("error");
-      setErrorMsg("Üyelik oluşturulamadı, tekrar dene.");
       return;
     }
 
