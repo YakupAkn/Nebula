@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { SetupTopBar } from "@/components/SetupTopBar";
+import { readLastProject } from "@/lib/hash-route";
 
 interface Project {
   id: string;
@@ -26,6 +27,8 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([session.user.id]);
   const [loading, setLoading] = useState(true);
   const [orgName, setOrgName] = useState("");
+  const [stats, setStats] = useState<Record<string, { members: number; open: number }>>({});
+  const [lastProjectId, setLastProjectId] = useState<string | null>(null);
   const [mode, setMode] = useState<"list" | "create">("list");
   const [projectName, setProjectName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -75,10 +78,25 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
     if (data?.name) setOrgName(data.name);
   };
 
+  const fetchStats = async () => {
+    const { data, error } = await supabase.rpc("get_project_stats", { org_id: organizationId });
+    if (error || !data) return;
+    const next: Record<string, { members: number; open: number }> = {};
+    for (const row of data as any[]) {
+      next[row.project_id] = {
+        members: Number(row.member_count) || 0,
+        open: Number(row.open_task_count) || 0,
+      };
+    }
+    setStats(next);
+  };
+
   useEffect(() => {
     fetchProjects();
     fetchOrgMembers();
     fetchOrgName();
+    fetchStats();
+    setLastProjectId(readLastProject());
   }, [organizationId]);
 
   const toggleMember = (userId: string) => {
@@ -118,6 +136,13 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
     onProjectSelected(project.id);
   };
 
+  const statsText = (id: string) => {
+    const s = stats[id];
+    return s ? `${s.members} üye · ${s.open} açık görev` : null;
+  };
+  const lastProject = projects.find((x) => x.id === lastProjectId) ?? null;
+  const otherProjects = projects.filter((x) => x.id !== lastProject?.id);
+
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-[#fafafa] p-4">
       <SetupTopBar email={session.user.email} />
@@ -142,16 +167,40 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
               ) : projects.length === 0 ? (
                 <p className="text-sm text-slate-500 text-center py-2 leading-relaxed">Henüz bir proje yok. İlk projeni oluştur, ekibini ekle ve görevleri takip etmeye başla.</p>
               ) : (
-                projects.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => onProjectSelected(p.id)}
-                    className="w-full flex items-center justify-between text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all text-sm font-medium text-slate-800"
-                  >
-                    <span className="truncate">{p.name}</span>
-                    <span className="text-slate-300 ml-3 shrink-0">→</span>
-                  </button>
-                ))
+                <>
+                  {lastProject && (
+                    <button
+                      onClick={() => onProjectSelected(lastProject.id)}
+                      className="w-full text-left p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 hover:border-indigo-400 transition-all mb-1"
+                    >
+                      <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1">
+                        Kaldığın yerden devam et
+                      </span>
+                      <span className="flex items-center justify-between">
+                        <span className="text-base font-bold text-slate-900 truncate">{lastProject.name}</span>
+                        <span className="text-indigo-400 ml-3 shrink-0">→</span>
+                      </span>
+                      {statsText(lastProject.id) && (
+                        <span className="block text-xs text-slate-500 mt-1">{statsText(lastProject.id)}</span>
+                      )}
+                    </button>
+                  )}
+                  {otherProjects.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => onProjectSelected(p.id)}
+                      className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all text-sm font-medium text-slate-800"
+                    >
+                      <span className="flex items-center justify-between">
+                        <span className="truncate">{p.name}</span>
+                        <span className="text-slate-300 ml-3 shrink-0">→</span>
+                      </span>
+                      {statsText(p.id) && (
+                        <span className="block text-xs text-slate-400 font-normal mt-0.5">{statsText(p.id)}</span>
+                      )}
+                    </button>
+                  ))}
+                </>
               )}
 
               <button
