@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { AppHeader, DashboardLink } from "@/components/AppHeader";
 import { ProfileSkeleton } from "@/components/ui/Skeleton";
 
 interface UserProfile {
@@ -205,7 +205,7 @@ export default function ProfilePage() {
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
               placeholder="E-posta adresinizi yazın"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition mb-4"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition mb-4"
             />
             <div className="flex gap-3">
               <button
@@ -226,43 +226,25 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <Link href="/" className="flex items-center space-x-2 text-slate-900 font-bold text-lg">
-              <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm">N</span>
-              <span>Nebula</span>
-            </Link>
-            <nav className="hidden md:flex space-x-2">
-              <Link href="/" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">Projeler</Link>
-              <Link href="/members" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">Üyeler</Link>
-              <Link href="/profile" className="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md">Profil</Link>
-              <Link href="/settings" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">Ayarlar</Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
+      <AppHeader
+        maxWidth="max-w-5xl"
+        actions={
+          <>
             <button
+              type="button"
               onClick={handleSignOut}
               disabled={signingOut}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-60"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
               </svg>
               {signingOut ? "Çıkılıyor..." : "Oturumu Kapat"}
             </button>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m7.5-7.5L3 12m7.5 0h10.5" />
-              </svg>
-              Dashboard
-            </Link>
-          </div>
-        </div>
-      </header>
+            <DashboardLink />
+          </>
+        }
+      />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         <div className="mb-2">
@@ -295,18 +277,18 @@ export default function ProfilePage() {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">{fullName || "Kullanıcı"}</h3>
                 <p className="text-sm text-slate-500">{email || "E-posta bilinmiyor"}</p>
-                <p className="text-xs text-slate-400 mt-0.5">Üye: {formatDate(createdAt)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Üye: {formatDate(createdAt)}</p>
               </div>
             </div>
 
             {/* Quick Stats */}
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
-                <p className="text-xs text-slate-400 mb-0.5">Son Giriş</p>
+                <p className="text-xs text-slate-500 mb-0.5">Son Giriş</p>
                 <p className="text-sm font-medium text-slate-700">{formatDate(lastSignIn)}</p>
               </div>
               <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
-                <p className="text-xs text-slate-400 mb-0.5">Hesap Durumu</p>
+                <p className="text-xs text-slate-500 mb-0.5">Hesap Durumu</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                   <p className="text-sm font-medium text-slate-700">Aktif</p>
@@ -323,7 +305,7 @@ export default function ProfilePage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Adınız ve soyadınız"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
                   disabled={saving}
                 />
               </div>
@@ -337,7 +319,7 @@ export default function ProfilePage() {
                     disabled
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-sm cursor-not-allowed"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Değiştirilemez</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Değiştirilemez</span>
                 </div>
               </div>
             </div>

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { AppHeader } from "@/components/AppHeader";
 import { MembersSkeleton } from "@/components/ui/Skeleton";
 
 interface MemberRow {
@@ -197,43 +197,7 @@ export default function MembersPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <Link href="/" className="flex items-center space-x-2 text-slate-900 font-bold text-lg">
-              <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm">
-                N
-              </span>
-              <span>Nebula</span>
-            </Link>
-            <nav className="hidden md:flex space-x-2">
-              <Link href="/" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">
-                Projeler
-              </Link>
-              <Link href="/members" className="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md">
-                Üyeler
-              </Link>
-              <Link href="/profile" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">
-                Profil
-              </Link>
-              <Link href="/settings" className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-100 transition">
-                Ayarlar
-              </Link>
-            </nav>
-          </div>
-          <div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m7.5-7.5L3 12m7.5 0h10.5" />
-              </svg>
-              Dashboard
-            </Link>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8">
@@ -265,7 +229,7 @@ export default function MembersPage() {
           <div className="grid gap-6 xl:grid-cols-[1fr_1.15fr]">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Yeni üye</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Yeni üye</p>
                 <h2 className="mt-2 text-xl font-semibold text-slate-900">Ekip ekle</h2>
               </div>
 
@@ -280,7 +244,7 @@ export default function MembersPage() {
                     value={newEmail}
                     onChange={(event) => setNewEmail(event.target.value)}
                     placeholder="ekip@firma.com"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                   />
                 </div>
 
@@ -292,7 +256,7 @@ export default function MembersPage() {
                     id="member-role"
                     value={newRole}
                     onChange={(event) => setNewRole(event.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                   >
                     <option value="member">Member</option>
                     <option value="owner">Owner</option>
@@ -311,7 +275,7 @@ export default function MembersPage() {
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Ekip</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Ekip</p>
                   <h2 className="mt-2 text-xl font-semibold text-slate-900">Mevcut üyeler</h2>
                 </div>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
@@ -349,14 +313,14 @@ export default function MembersPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${roleStyles[member.role] ?? "bg-slate-100 text-slate-700"}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${roleStyles[member.role] ?? "bg-slate-100 text-slate-700"}`}>
                           {member.role}
                         </span>
                         {member.user_id !== sessionUserId && (
                           <button
                             type="button"
                             onClick={() => handleRemoveMember(member.id, member.user_id, member.profiles?.full_name || member.email || "Kullanıcı")}
-                            className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
+                            className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
                           >
                             Çıkar
                           </button>

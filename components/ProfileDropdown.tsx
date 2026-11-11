@@ -30,6 +30,15 @@ export function ProfileDropdown({ fullName, email, onLogout }: ProfileDropdownPr
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setIsOpen(false);
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen]);
+
   const displayName = fullName || email?.split("@")[0] || "Kullanıcı";
 
   const handleProfileClick = () => {
@@ -64,6 +73,9 @@ export function ProfileDropdown({ fullName, email, onLogout }: ProfileDropdownPr
       <button
         type="button"
         onClick={() => setIsOpen((v) => !v)}
+        aria-label="Hesap menüsü"
+        aria-haspopup="true"
+        aria-expanded={isOpen}
         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-all"
       >
         <span className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
@@ -72,7 +84,7 @@ export function ProfileDropdown({ fullName, email, onLogout }: ProfileDropdownPr
         <span className="hidden md:block text-sm font-semibold text-slate-700 max-w-[120px] truncate">
           {displayName}
         </span>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 text-slate-400 hidden md:block">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 text-slate-500 hidden md:block">
           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
       </button>
@@ -81,7 +93,7 @@ export function ProfileDropdown({ fullName, email, onLogout }: ProfileDropdownPr
         <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
           <div className="px-3.5 py-2.5">
             <p className="text-sm font-semibold text-slate-800 truncate">{displayName}</p>
-            <p className="text-xs text-slate-400 truncate mt-0.5">{email}</p>
+            <p className="text-xs text-slate-500 truncate mt-0.5">{email}</p>
           </div>
 
           <div className="h-px bg-slate-100" />
