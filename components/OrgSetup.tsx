@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
+import { SetupTopBar, signOutAndGoHome } from "@/components/SetupTopBar";
 
 interface OrgSetupProps {
   session: Session;
@@ -47,7 +48,8 @@ export function OrgSetup({ session, onOrgCreated }: OrgSetupProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#fafafa] p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#fafafa] p-4">
+      <SetupTopBar email={session.user.email} />
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Nebula</h1>
@@ -74,6 +76,16 @@ export function OrgSetup({ session, onOrgCreated }: OrgSetupProps) {
               >
                 Davet Bekliyorum
               </button>
+              <div className="pt-3 mt-1 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-400">Yanlış hesapla mı girdin?</p>
+                <button
+                  type="button"
+                  onClick={signOutAndGoHome}
+                  className="text-xs text-rose-600 font-semibold mt-1 hover:underline"
+                >
+                  Çıkış yap ve hesap değiştir
+                </button>
+              </div>
             </div>
           )}
 
