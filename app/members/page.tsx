@@ -10,7 +10,6 @@ interface MemberRow {
   id: string;
   user_id: string;
   role: string;
-  email?: string | null;
   profiles?: {
     full_name: string | null;
     avatar_url: string | null;
@@ -31,7 +30,11 @@ export default function MembersPage() {
   });
 
   const fetchMembers = async (orgId: string) => {
-    const { data, error } = await supabase.rpc("get_org_members", { org_id: orgId });
+    const { data, error } = await supabase
+      .from("organization_members")
+      .select("id, user_id, role, profiles:user_id(full_name, avatar_url)")
+      .eq("organization_id", orgId)
+      .order("role", { ascending: true });
 
     if (error) {
       console.error("Üyeler yüklenirken hata oluştu:", error);
@@ -39,24 +42,23 @@ export default function MembersPage() {
       return;
     }
 
-    const rows = (data ?? []) as Array<{
+    const normalizedMembers = ((data ?? []) as Array<{
       id: string;
       user_id: string;
       role: string;
-      full_name: string | null;
-      avatar_url: string | null;
-      email: string | null;
-    }>;
+      profiles?: Array<{ full_name: string | null; avatar_url: string | null }> | { full_name: string | null; avatar_url: string | null } | null;
+    }>).map((member) => {
+      const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
 
-    setMembers(
-      rows.map((row) => ({
-        id: row.id,
-        user_id: row.user_id,
-        role: row.role,
-        email: row.email,
-        profiles: { full_name: row.full_name, avatar_url: row.avatar_url },
-      }))
-    );
+      return {
+        id: member.id,
+        user_id: member.user_id,
+        role: member.role,
+        profiles: profile ?? null,
+      } satisfies MemberRow;
+    });
+
+    setMembers(normalizedMembers);
   };
 
   useEffect(() => {
@@ -112,33 +114,35 @@ export default function MembersPage() {
       return;
     }
 
-    const { data, error: rpcError } = await supabase.rpc("add_org_member_by_email", {
-      org_id: organizationId,
-      member_email: newEmail.trim(),
-      member_role: newRole === "owner" ? "owner" : "member",
+    const { data: users, error: searchError } = await supabase.rpc("find_user_by_email", {
+      search_email: newEmail.trim(),
     });
 
-    if (rpcError || !data) {
-      setStatus({ type: "error", text: "Üye eklenirken bir hata oluştu." });
-      console.error(rpcError);
-      return;
-    }
-
-    const addResult = (data as { status: string }).status;
-    if (addResult === "not_found") {
+    if (searchError || !users || users.length === 0) {
       setStatus({ type: "not_found", text: "Bu e-posta ile kayıtlı bir kullanıcı bulunamadı." });
       return;
     }
-    if (addResult === "already_member") {
+
+    const foundUser = users[0];
+
+    if (members.some((member) => member.user_id === foundUser.id)) {
       setStatus({ type: "error", text: "Bu kullanıcı zaten organizasyon üyeliğinde." });
       return;
     }
-    if (addResult === "forbidden") {
-      setStatus({ type: "error", text: "Üye eklemek için organizasyon sahibi olmalısınız." });
-      return;
-    }
-    if (addResult !== "added") {
+
+    const { error: insertError } = await supabase
+      .from("organization_members")
+      .insert([
+        {
+          organization_id: organizationId,
+          user_id: foundUser.id,
+          role: newRole,
+        },
+      ]);
+
+    if (insertError) {
       setStatus({ type: "error", text: "Üye eklenirken bir hata oluştu." });
+      console.error(insertError);
       return;
     }
 
@@ -157,15 +161,11 @@ export default function MembersPage() {
     const confirmed = window.confirm(`${name} isimli üyeyi organizasyondan çıkarmak istediğinize emin misiniz?`);
     if (!confirmed) return;
 
-    const { data, error } = await supabase.rpc("remove_org_member", { member_row_id: memberId });
-    const removeResult = (data as { status?: string } | null)?.status;
+    const { error } = await supabase.from("organization_members").delete().eq("id", memberId);
 
-    if (error || removeResult !== "removed") {
-      setStatus({
-        type: "error",
-        text: removeResult === "forbidden" ? "Üye çıkarmak için organizasyon sahibi olmalısınız." : "Üye çıkarılırken bir hata oluştu.",
-      });
-      if (error) console.error(error);
+    if (error) {
+      setStatus({ type: "error", text: "Üye çıkarılırken bir hata oluştu." });
+      console.error(error);
       return;
     }
 
@@ -294,8 +294,10 @@ export default function MembersPage() {
                     onChange={(event) => setNewRole(event.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                   >
-                    <option value="member">Member</option>
                     <option value="owner">Owner</option>
+                    <option value="admin">Admin</option>
+                    <option value="member">Member</option>
+                    <option value="viewer">Viewer</option>
                   </select>
                 </div>
 
@@ -336,15 +338,15 @@ export default function MembersPage() {
                           />
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
-                            {getInitials(member.profiles?.full_name || member.email || null)}
+                            {getInitials(member.profiles?.full_name ?? null)}
                           </div>
                         )}
 
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-800">
-                            {member.profiles?.full_name || member.email || "İsimsiz kullanıcı"}
+                            {member.profiles?.full_name || "İsimsiz kullanıcı"}
                           </p>
-                          <p className="truncate text-xs text-slate-500">{member.email ?? member.role}</p>
+                          <p className="text-xs text-slate-500">{member.role}</p>
                         </div>
                       </div>
 
@@ -355,7 +357,7 @@ export default function MembersPage() {
                         {member.user_id !== sessionUserId && (
                           <button
                             type="button"
-                            onClick={() => handleRemoveMember(member.id, member.user_id, member.profiles?.full_name || member.email || "Kullanıcı")}
+                            onClick={() => handleRemoveMember(member.id, member.user_id, member.profiles?.full_name || "Kullanıcı")}
                             className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
                           >
                             Çıkar
