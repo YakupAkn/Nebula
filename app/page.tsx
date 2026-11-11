@@ -15,6 +15,7 @@ import { InviteAccept } from "../components/InviteAccept";
 import { WelcomeOnboarding } from "../components/WelcomeOnboarding";
 import { AppTour } from "../components/AppTour";
 import { SecurityNoticeModal } from "../components/SecurityNoticeModal";
+import { ActivityFeed, type ActivityEvent } from "../components/ActivityHistory";
 import { LEGAL } from "@/lib/legal";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import { supabase } from "@/lib/supabase";
@@ -73,6 +74,7 @@ export default function Home() {
       ? route.projectId
       : null;
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [projectActivity, setProjectActivity] = useState<ActivityEvent[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newTag, setNewTag] = useState("Yazılım");
@@ -163,6 +165,22 @@ export default function Home() {
       setTasks((data as SupabaseTask[]).map((t) => ({ ...t, id: t.id.toString() })));
     }
     setLoading(false);
+  };
+
+  const fetchProjectActivity = async () => {
+    if (!projectId) return;
+    const { data, error } = await supabase
+      .from("activity_events")
+      .select("id, actor_name, event_type, task_title, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(15);
+
+    if (error) {
+      console.error("Proje aktivitesi alınamadı:", error.message);
+      return;
+    }
+    setProjectActivity((data ?? []) as ActivityEvent[]);
   };
 
   useEffect(() => {
@@ -323,8 +341,10 @@ export default function Home() {
     if (!session || !organizationId || !projectId) return;
 
     setTasks([]);
+    setProjectActivity([]);
     setLoading(true);
     fetchTasks();
+    fetchProjectActivity();
 
     const channel = supabase
       .channel(`realtime-tasks-${projectId}`)
@@ -333,6 +353,7 @@ export default function Home() {
         { event: "*", schema: "public", table: "tasks", filter: `project_id=eq.${projectId}` },
         () => {
           fetchTasks();
+          fetchProjectActivity();
         }
       )
       .subscribe();
@@ -732,6 +753,10 @@ export default function Home() {
                 onTaskClick={openTask}
               />
             ))}
+          </div>
+
+          <div className="mt-8">
+            <ActivityFeed events={projectActivity} />
           </div>
 
           {process.env.NODE_ENV === "development" && (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { AppHeader, DashboardLink } from "@/components/AppHeader";
 import { ProfileSkeleton } from "@/components/ui/Skeleton";
+import { ActivityFeed, ContributionGraph, type ActivityEvent } from "@/components/ActivityHistory";
 
 interface UserProfile {
   id: string;
@@ -26,6 +27,7 @@ export default function ProfilePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [lastSignIn, setLastSignIn] = useState<string | null>(null);
+  const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([]);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -59,6 +61,20 @@ export default function ProfilePage() {
           const typedProfile = profile as UserProfile;
           setFullName(typedProfile.full_name ?? "");
           setAvatarUrl(typedProfile.avatar_url ?? null);
+        }
+
+        const { data: activities, error: activityError } = await supabase
+          .from("activity_events")
+          .select("id, actor_name, event_type, task_title, created_at")
+          .eq("actor_id", user.id)
+          .gte("created_at", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
+          .order("created_at", { ascending: false })
+          .limit(1000);
+
+        if (activityError) {
+          console.error("Aktivite geçmişi alınamadı:", activityError.message);
+        } else {
+          setActivityEvents((activities ?? []) as ActivityEvent[]);
         }
       } catch (err) {
         console.error("Yükleme hatası:", err);
@@ -336,6 +352,9 @@ export default function ProfilePage() {
             </div>
           </form>
         </div>
+
+        <ContributionGraph events={activityEvents} />
+        <ActivityFeed events={activityEvents.slice(0, 15)} personal />
 
         {/* Session Management */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
