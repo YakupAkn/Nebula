@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
+import { SetupTopBar } from "@/components/SetupTopBar";
 
 interface Project {
   id: string;
@@ -24,6 +25,7 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([session.user.id]);
   const [loading, setLoading] = useState(true);
+  const [orgName, setOrgName] = useState("");
   const [mode, setMode] = useState<"list" | "create">("list");
   const [projectName, setProjectName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -64,9 +66,19 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
     }
   };
 
+  const fetchOrgName = async () => {
+    const { data } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (data?.name) setOrgName(data.name);
+  };
+
   useEffect(() => {
     fetchProjects();
     fetchOrgMembers();
+    fetchOrgName();
   }, [organizationId]);
 
   const toggleMember = (userId: string) => {
@@ -107,11 +119,17 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#fafafa] p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#fafafa] p-4">
+      <SetupTopBar email={session.user.email} />
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Nebula</h1>
           <p className="text-slate-500 text-sm mt-2 font-medium">Bir proje seç ya da yeni oluştur.</p>
+          {orgName && (
+            <span className="inline-block mt-3 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-full px-3 py-1">
+              {orgName}
+            </span>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -122,15 +140,16 @@ export function ProjectSetup({ session, organizationId, onProjectSelected }: Pro
                   <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : projects.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-2">Henüz bir proje yok.</p>
+                <p className="text-sm text-slate-500 text-center py-2 leading-relaxed">Henüz bir proje yok. İlk projeni oluştur, ekibini ekle ve görevleri takip etmeye başla.</p>
               ) : (
                 projects.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => onProjectSelected(p.id)}
-                    className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all text-sm font-medium text-slate-800"
+                    className="w-full flex items-center justify-between text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all text-sm font-medium text-slate-800"
                   >
-                    {p.name}
+                    <span className="truncate">{p.name}</span>
+                    <span className="text-slate-300 ml-3 shrink-0">→</span>
                   </button>
                 ))
               )}
