@@ -10,14 +10,52 @@ interface OrgMembersProps {
   onClose: () => void;
 }
 
+interface OrgMemberRow {
+  id: string;
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+}
+
+const ROLE_LABEL: Record<string, string> = { owner: "Sahip", member: "Üye" };
+
 export function OrgMembers({ organizationId, projectId, onClose }: OrgMembersProps) {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "not_found" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "not_found" | "already" | "forbidden" | "error">("idle");
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(Boolean(projectId));
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [members, setMembers] = useState<OrgMemberRow[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [membersError, setMembersError] = useState(false);
+
+  const loadMembers = async () => {
+    const { data, error } = await supabase.rpc("get_org_members", { org_id: organizationId });
+    if (error) {
+      setMembersError(true);
+    } else {
+      setMembersError(false);
+      setMembers((data ?? []) as OrgMemberRow[]);
+    }
+    setMembersLoading(false);
+  };
+
+  useEffect(() => {
+    loadMembers();
+  }, [organizationId]);
+
+  // Esc ile kapat
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // Projenin süresi dolmamış, iptal edilmemiş en son davet linkini göster
   useEffect(() => {
@@ -91,44 +129,111 @@ export function OrgMembers({ organizationId, projectId, onClose }: OrgMembersPro
 
     setStatus("loading");
 
-    const { data: users, error: searchError } = await supabase.rpc("find_user_by_email", {
-      search_email: email.trim(),
+    const { data, error } = await supabase.rpc("add_org_member_by_email", {
+      org_id: organizationId,
+      member_email: email.trim(),
+      member_role: "member",
     });
 
-    if (searchError || !users || users.length === 0) {
-      setStatus("not_found");
+    if (error || !data) {
+      setStatus("error");
       return;
     }
 
-    const foundUser = users[0];
-
-    const { error: insertError } = await supabase
-      .from("organization_members")
-      .insert([{ organization_id: organizationId, user_id: foundUser.id, role: "member" }]);
-
-    if (insertError) {
+    const result = (data as { status: string }).status;
+    if (result === "not_found") {
+      setStatus("not_found");
+      return;
+    }
+    if (result === "already_member") {
+      setStatus("already");
+      return;
+    }
+    if (result === "forbidden") {
+      setStatus("forbidden");
+      return;
+    }
+    if (result !== "added") {
       setStatus("error");
       return;
     }
 
     setStatus("success");
     setEmail("");
+    loadMembers();
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl border border-slate-200">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="org-members-title"
+        className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-xl border border-slate-200"
+      >
         <div className="flex justify-between items-start mb-4">
-          <h2 className="text-lg font-bold text-slate-900">Üye Ekle</h2>
+          <h2 id="org-members-title" className="text-lg font-bold text-slate-900">Üyeler</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-all"
+            aria-label="Kapat"
+            className="text-slate-500 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
+
+        <section aria-label="Organizasyon üyeleri" className="mb-5">
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
+            Organizasyon üyeleri {!membersLoading && !membersError ? `(${members.length})` : ""}
+          </p>
+          {membersLoading ? (
+            <p className="text-xs text-slate-600" role="status">Yükleniyor...</p>
+          ) : membersError ? (
+            <p className="text-xs text-rose-700 font-medium">Üyeler yüklenemedi, tekrar dene.</p>
+          ) : members.length === 0 ? (
+            <p className="text-xs text-slate-600">Henüz üye yok.</p>
+          ) : (
+            <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {members.map((m) => {
+                const label = m.full_name || m.email || "İsimsiz kullanıcı";
+                return (
+                  <li
+                    key={m.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {m.avatar_url ? (
+                        <img
+                          src={m.avatar_url}
+                          alt=""
+                          className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-700 text-[11px] font-bold text-white"
+                        >
+                          {label.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">{label}</p>
+                        {m.full_name && m.email && (
+                          <p className="truncate text-xs text-slate-600">{m.email}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-800">
+                      {ROLE_LABEL[m.role] ?? m.role}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         <form onSubmit={handleAddMember} className="space-y-3">
           <div>
@@ -153,10 +258,16 @@ export function OrgMembers({ organizationId, projectId, onClose }: OrgMembersPro
               Bu e-posta ile kayıtlı bir kullanıcı bulunamadı. Önce kişinin giriş yapması gerekiyor.
             </p>
           )}
-          {status === "error" && (
+          {status === "already" && (
+            <p className="text-xs text-amber-600 font-medium">Bu kişi zaten organizasyonun üyesi.</p>
+          )}
+          {status === "forbidden" && (
             <p className="text-xs text-rose-600 font-medium">
-              Ekleme başarısız oldu — zaten üye olabilir.
+              E-posta ile üye eklemek için organizasyon sahibi olmalısın. Aşağıdaki davet linkini kullanabilirsin.
             </p>
+          )}
+          {status === "error" && (
+            <p className="text-xs text-rose-600 font-medium">Ekleme başarısız oldu, tekrar dene.</p>
           )}
           {status === "success" && (
             <p className="text-xs text-emerald-600 font-medium">Üye eklendi.</p>
